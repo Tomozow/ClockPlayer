@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clock Player 取扱説明書</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #faf9f8; /* わずかに温かみのあるオフホワイト */
+      --card-bg: #ffffff;
+      --text-main: #333333;
+      --text-muted: #7f7f7f;
+      --border-color: #e6e5e2;
+      --accent-color: #7f1917; /* 無印良品のエンジ色をイメージしたアクセント */
+      --accent-light: #f5eded;
+      --info-bg: #f0f4f8;
+      --info-text: #455a64;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      line-height: 1.8;
+      padding: 60px 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 50px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 30px;
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      fill: var(--accent-color);
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    section {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      padding: 35px;
+      margin-bottom: 30px;
+    }
+
+    h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 25px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-main);
+      border-left: 3px solid var(--accent-color);
+      padding-left: 12px;
+    }
+
+    h2 svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--text-muted);
+    }
+
+    p {
+      font-size: 0.95rem;
+      margin-bottom: 15px;
+    }
+
+    /* File List Layout */
+    .file-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 25px;
+    }
+
+    .file-item {
+      padding: 12px 16px;
+      border-bottom: 1px dashed var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .file-item:last-child {
+      border-bottom: none;
+    }
+
+    .file-name {
+      font-family: monospace;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .file-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-align: right;
+    }
+
+    /* Folder Structure Tree */
+    .tree {
+      font-family: monospace;
+      background: #fcfbfa;
+      padding: 20px;
+      border: 1px solid var(--border-color);
+      overflow-x: auto;
+      font-size: 0.85rem;
+      color: #555555;
+    }
+    .tree-folder {
+      color: var(--accent-color);
+      font-weight: 700;
+    }
+    .tree-file {
+      color: var(--text-main);
+    }
+
+    /* Steps (Simple Vertical Timeline) */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .step-card {
+      display: flex;
+      gap: 20px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 20px;
+    }
+
+    .step-card:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .step-number {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent-color);
+      width: 28px;
+      flex-shrink: 0;
+    }
+
+    .step-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 6px;
+      color: var(--text-main);
+    }
+
+    .step-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    /* Alerts (Minimalist Blocks) */
+    .alert {
+      padding: 20px;
+      margin-bottom: 20px;
+      border-left: 3px solid;
+    }
+
+    .alert-danger {
+      background: var(--accent-light);
+      border-left-color: var(--accent-color);
+      color: #5c1b1a;
+    }
+    .alert-danger h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--accent-color);
+    }
+
+    .alert-info {
+      background: var(--info-bg);
+      border-left-color: var(--info-text);
+      color: var(--info-text);
+    }
+    .alert-info h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--info-text);
+    }
+
+    .alert p {
+      font-size: 0.85rem;
+      margin-bottom: 0;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      margin-top: 60px;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border-color);
+      padding-top: 30px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo-area">
+      <svg class="logo-icon" viewBox="0 0 24 24">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/>
+      </svg>
+      <h1>Clock Player</h1>
+    </div>
+    <p class="subtitle">取扱説明書 / Manual</p>
+  </header>
+
+  <!-- Overview -->
+  <section id="overview">
+    <h2>アプリ概要</h2>
+    <p>
+      本アプリは、時間帯（朝、昼、夕方、夜など）に応じて、対応するフォルダに配置された音楽ファイルを自動的に切り替えて再生する、時計機能付きのWebブラウザ型ミュージックプレイヤーです。
+    </p>
+  </section>
+
+  <!-- File Structure -->
+  <section id="files">
+    <h2>同梱ファイル構成</h2>
+    <div class="file-list">
+      <div class="file-item">
+        <span class="file-name">index.html</span>
+        <span class="file-desc">アプリのメイン画面・UI</span>
+      </div>
+      <div class="file-item">
+        <span class="file-name">index.css</span>
+        <span class="file-desc">アプリのデザイン設定（CSS）</span>
+      </div>
+      <div class="file-item">
+        <span class="file-name">index.js</span>
+        <span class="file-desc">再生制御・スケジュール判定ロジック</span>
+      </div>
+      <div class="file-item">
+        <span class="file-name">bgm_manifest.js</span>
+        <span class="file-desc">音楽ファイルリスト（自動生成用）</span>
+      </div>
+      <div class="file-item">
+        <span class="file-name">update_bgm.bat</span>
+        <span class="file-desc">手動配置用のファイル更新バッチ</span>
+      </div>
+      <div class="file-item">
+        <span class="file-name">sample_preset.json</span>
+        <span class="file-desc">スケジュールのサンプルプリセット</span>
+      </div>
+    </div>
+
+    <div class="tree">
+      <span class="tree-folder">html_bgmclock /</span><br>
+      ├── <span class="tree-file">index.html</span><br>
+      ├── <span class="tree-file">index.css</span><br>
+      ├── <span class="tree-file">index.js</span><br>
+      ├── <span class="tree-file">bgm_manifest.js</span><br>
+      ├── <span class="tree-file">update_bgm.bat</span><br>
+      ├── <span class="tree-file">README.html</span> (本説明書)<br>
+      └── <span class="tree-folder">bgm /</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;├── <span class="tree-folder">bgmA ~ bgmF /</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── (各時間帯に対応するフォルダ)
+    </div>
+  </section>
+
+  <!-- Easy Method: Direct Add (Recommended) -->
+  <section id="easy-method">
+    <h2>ブラウザから音楽ファイルを追加する（推奨）</h2>
+    <p style="margin-bottom: 25px; font-size: 0.9rem; color: var(--text-muted);">
+      ※ Chrome または Edge などの File System Access API 対応ブラウザでご利用いただけます。
+    </p>
+
+    <div class="steps">
+      <div class="step-card">
+        <div class="step-number">01</div>
+        <div>
+          <div class="step-title">アプリのルートフォルダを接続する</div>
+          <div class="step-desc">
+            画面右上にある <strong>歯車アイコン（設定）</strong> をクリックして設定パネルを開き、「フォルダー同期・音楽ファイルの追加」セクションの <strong>「📂 アプリのルートフォルダを接続」</strong> ボタンをクリックします。ブラウザのダイアログからアプリのある親フォルダを選択し、編集権限を承認します。
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">02</div>
+        <div>
+          <div class="step-title">音楽ファイルのインポート</div>
+          <div class="step-desc">
+            接続完了後、<strong>「音楽ファイルの追加・コピー」</strong> ボタンをクリックします。追加したい時間帯を選択した状態でボタンを押し、PC内の音楽ファイル（<code>.mp3</code>, <code>.wav</code>, <code>.m4a</code>, <code>.flac</code> など）を選択します。
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">03</div>
+        <div>
+          <div class="step-title">自動同期完了</div>
+          <div class="step-desc">
+            コピーが完了すると <code>bgm_manifest.js</code> が自動的に再生成され、即座に曲がプレイヤーに反映されます（バッチファイルの実行は不要です）。
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Manual Method -->
+  <section id="manual-method">
+    <h2>手動でフォルダに配置して追加する</h2>
+    <div class="steps">
+      <div class="step-card">
+        <div class="step-number">01</div>
+        <div>
+          <div class="step-title">「bgm」フォルダへの配置</div>
+          <div class="step-desc">
+            「bgm」フォルダ配下の各フォルダ（bgmA 〜 bgmF）に、音楽ファイルをエクスプローラー等で直接保存します。
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">02</div>
+        <div>
+          <div class="step-title">「update_bgm.bat」の実行</div>
+          <div class="step-desc">
+            ファイルを配置・変更した後は、必ず <strong>「update_bgm.bat」をダブルクリック</strong> して実行してください。これによりプレイリスト情報が更新されます。
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Schedule & Presets -->
+  <section id="schedule">
+    <h2>スケジュールとプリセットの設定</h2>
+    <p style="margin-bottom: 15px;">
+      <strong>■ スケジュールの変更:</strong><br>
+      設定パネル内の「24時間スライダー」の境界をドラッグして、時間帯の切り替え時間を調整できます。各時間帯に割り当てるフォルダも変更可能です。
+    </p>
+    <p>
+      <strong>■ プリセット:</strong><br>
+      用意されたプリセットを切り替えるか、<code>sample_preset.json</code> を設定パネルの「ファイルを取り込む」からインポートして適用します。
+    </p>
+  </section>
+
+  <!-- OBS Studio Integration -->
+  <section id="obs-setup">
+    <h2>OBS Studio ブラウザソース設定方法</h2>
+    <p>
+      本アプリは、OBS Studioの「ブラウザ」ソースとして取り込むことで、配信画面上に時計とプレイヤーを表示することができます。
+    </p>
+    <div class="steps">
+      <div class="step-card">
+        <div class="step-number">01</div>
+        <div>
+          <div class="step-title">ブラウザソースの追加</div>
+          <div class="step-desc">
+            OBSの「ソース」エリアの <strong>「+」ボタン</strong> をクリックし、<strong>「ブラウザ」</strong> を選択して新規作成します。
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">02</div>
+        <div>
+          <div class="step-title">ファイルの指定</div>
+          <div class="step-desc">
+            設定プロパティ画面で <strong>「ローカルファイル」</strong> にチェックを入れ、参照ボタンからアプリフォルダ内の <strong><code>obs.html</code></strong> を選択します。
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">03</div>
+        <div>
+          <div class="step-title">サイズと音声設定</div>
+          <div class="step-desc">
+            <code>obs.html</code> は画面左上に整列され、ドロップシャドウ（影）がきれいに表示されるよう <strong><code>20px</code> の外側マージン</strong> が確保されています。<br>
+            OBSブラウザソースのサイズは、横幅 <strong><code>950</code></strong>、縦幅はミニマルモードであれば <strong><code>150</code></strong> （通常表示の場合は <strong><code>440</code></strong> など）に設定することをおすすめします。<br>
+            BGMの音声をOBS経由で配信・制御したい場合は、<strong>「OBSで音声を制御する」</strong> にチェックを入れます。
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Notes -->
+  <section id="notes">
+    <h2>注意事項</h2>
+
+    <div class="alert alert-danger">
+      <h3>手動でのファイル操作時</h3>
+      <p>手動でファイルをフォルダへ配置した場合は、必ず「update_bgm.bat」を実行してください。実行しないと追加した曲が再生されません。</p>
+    </div>
+
+    <div class="alert alert-info">
+      <h3>ブラウザからのコピー機能使用時</h3>
+      <p>「音楽ファイルの追加・コピー」機能で追加した場合は、自動的に同期されるためバッチファイルを実行する必要はありません。</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>&copy; Clock Player</p>
+  </footer>
+</div>
+
+</body>
+</html>

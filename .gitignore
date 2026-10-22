@@ -1,0 +1,6 @@
+bgm/
+bgm_manifest.js
+backups/
+dist/
+obs-stream-manager/
+bgm_schedule_template_*.json
