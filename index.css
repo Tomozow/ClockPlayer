@@ -1399,3 +1399,6 @@ html.dock-mode .volume-container .control-btn {
 html.dock-mode .volume-slider {
   width: 80px;
 }
+#library-usage.library-usage-warn {
+  color: #e0a040;
+}

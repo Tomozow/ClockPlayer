@@ -100,9 +100,8 @@ window.ClockLibrary = (() => {
       const file = audioFiles[i];
       const name = await uniqueName(dir, file.name);
       const handle = await dir.getFileHandle(name, { create: true });
-      const writable = await handle.createWritable();
-      await writable.write(file);
-      await writable.close();
+      // 曲全体をメモリに載せずに少しずつ書き込む（pipeTo が書き込み後に閉じる）
+      await file.stream().pipeTo(await handle.createWritable());
 
       let meta = null;
       try { meta = await readMeta(file); } catch (e) { /* メタデータが読めなくても取り込む */ }
@@ -125,7 +124,7 @@ window.ClockLibrary = (() => {
 
     manifest[folder].sort((a, b) => a.name.localeCompare(b.name));
     await saveManifest(manifest);
-    if (navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    await requestPersist();
     return manifest;
   }
 
@@ -154,6 +153,24 @@ window.ClockLibrary = (() => {
     return emptyManifest();
   }
 
+  // 保存領域の永続化を求める。認められないと、ディスクが足りなくなったときにブラウザが消すことがある
+  async function requestPersist() {
+    try {
+      if (await isPersisted()) return true;
+      return navigator.storage.persist ? await navigator.storage.persist() : false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function isPersisted() {
+    try {
+      return navigator.storage.persisted ? await navigator.storage.persisted() : false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   async function getUsage() {
     try {
       const { usage } = await navigator.storage.estimate();
@@ -176,5 +193,5 @@ window.ClockLibrary = (() => {
     return currentObjectUrl;
   }
 
-  return { isSupported, isActive, loadManifest, pruneMissing, importFiles, removeFile, clearFolder, clearAll, getUsage, getTrackUrl };
+  return { isSupported, isActive, loadManifest, pruneMissing, importFiles, removeFile, clearFolder, clearAll, getUsage, requestPersist, isPersisted, getTrackUrl };
 })();

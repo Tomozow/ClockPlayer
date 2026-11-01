@@ -2221,16 +2221,51 @@ async function scanBgmFolderRecursively(dirHandle, currentPath) {
 
 // --- Client-Side Audio Metadata Extraction ---
 
+// タグの読み取りに必要な部分だけを読む（曲全体をメモリに載せない）
+const MP3_TAG_READ_LIMIT = 2 * 1024 * 1024;
+const M4A_MOOV_READ_LIMIT = 16 * 1024 * 1024;
+
+async function readMp3TagBuffer(fileObj) {
+  const header = new DataView(await fileObj.slice(0, 10).arrayBuffer());
+  if (header.byteLength < 10) return null;
+  const size = ((header.getUint8(6) & 0x7F) << 21) | ((header.getUint8(7) & 0x7F) << 14) |
+               ((header.getUint8(8) & 0x7F) << 7) | (header.getUint8(9) & 0x7F);
+  return fileObj.slice(0, Math.min(10 + size, MP3_TAG_READ_LIMIT)).arrayBuffer();
+}
+
+// 最上位の箱の見出しだけをたどって moov 箱を探し、その部分だけを読む
+async function readM4aMoovBuffer(fileObj) {
+  let offset = 0;
+  while (offset + 8 <= fileObj.size) {
+    const head = new DataView(await fileObj.slice(offset, offset + 16).arrayBuffer());
+    let size = head.getUint32(0);
+    const type = String.fromCharCode(head.getUint8(4), head.getUint8(5), head.getUint8(6), head.getUint8(7));
+    if (size === 1 && head.byteLength >= 16) {
+      size = Number(head.getBigUint64(8)); // 64bit サイズ
+    } else if (size === 0) {
+      size = fileObj.size - offset; // ファイル末尾まで
+    }
+    if (size < 8) return null;
+    if (type === 'moov') {
+      if (size > M4A_MOOV_READ_LIMIT) return null;
+      return fileObj.slice(offset, offset + size).arrayBuffer();
+    }
+    offset += size;
+  }
+  return null;
+}
+
 async function extractAudioMetadata(fileObj) {
   try {
-    const arrayBuffer = await fileObj.arrayBuffer();
     const name = fileObj.name.toLowerCase();
     
     let meta = null;
     if (name.endsWith('.mp3')) {
-      meta = parseMp3Metadata(arrayBuffer);
+      const buffer = await readMp3TagBuffer(fileObj);
+      if (buffer) meta = parseMp3Metadata(buffer);
     } else if (name.endsWith('.m4a')) {
-      meta = parseM4aMetadata(arrayBuffer);
+      const buffer = await readM4aMoovBuffer(fileObj);
+      if (buffer) meta = parseM4aMetadata(buffer);
     }
     
     if (meta && (meta.artist || meta.title)) {
@@ -2507,9 +2542,8 @@ async function copyFilesToBgmFolder() {
 
         updateProgressLog(`コピー中: ${file.name} -> ${destName}...`);
         const destFileHandle = await targetFolder.getFileHandle(destName, { create: true });
-        const writable = await destFileHandle.createWritable();
-        await writable.write(file);
-        await writable.close();
+        // 曲全体をメモリに載せずに少しずつ書き込む（pipeTo が書き込み後に閉じる）
+        await file.stream().pipeTo(await destFileHandle.createWritable());
 
         copiedCount++;
         updateProgressLog(' [完了]\n');
@@ -2810,7 +2844,12 @@ function formatBytes(bytes) {
 
 async function refreshLibraryUsage() {
   const usageEl = document.getElementById('library-usage');
-  if (usageEl) usageEl.textContent = formatBytes(await ClockLibrary.getUsage());
+  if (!usageEl) return;
+  const usage = await ClockLibrary.getUsage();
+  const persisted = usage === 0 || await ClockLibrary.isPersisted();
+  usageEl.textContent = persisted ? formatBytes(usage) : `${formatBytes(usage)}・消える可能性あり`;
+  usageEl.classList.toggle('library-usage-warn', !persisted);
+  usageEl.title = persisted ? '' : 'ディスクの空きが少なくなると、ブラウザが取り込んだ曲を削除することがあります';
 }
 
 function renderLibraryList() {
@@ -2897,6 +2936,8 @@ async function pickFolderToLibrary() {
 }
 
 function initBrowserLibraryUI() {
+  // 取り込んだ曲をブラウザに消されにくくする
+  ClockLibrary.requestPersist().then(refreshLibraryUsage);
   const faccess = document.getElementById('faccess-supported-container');
   const unsupported = document.getElementById('faccess-unsupported-msg');
   const library = document.getElementById('library-container');
