@@ -735,6 +735,8 @@ function handleActiveSegmentChange(oldIndex, newIndex, forcePlay) {
     // 再生中の時間帯切替、または再生ボタンからの明示的な要求の場合だけ再生する
     if (wasPlaying || forcePlay) {
       playNextTrack(true); // Switch & play immediately
+    } else if (trackTitle && trackTitle.textContent === '曲が登録されていません') {
+      trackTitle.textContent = '再生中の曲はありません';
     }
   }
 }
@@ -2782,6 +2784,40 @@ async function importToLibrary(fileList) {
   notifyLibraryUpdated();
 }
 
+// フォルダを選び、中の曲（サブフォルダを含む）を保存領域にコピーする
+async function pickFolderToLibrary() {
+  if (typeof window.showDirectoryPicker !== 'function') {
+    document.getElementById('library-dir-input').click();
+    return;
+  }
+  let dirHandle;
+  try {
+    dirHandle = await window.showDirectoryPicker({ id: 'clockplayer-import' });
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    // OBS のドックなどで使えない場合は従来のフォルダ選択に切り替える
+    document.getElementById('library-dir-input').click();
+    return;
+  }
+  const files = [];
+  const collect = async (dir) => {
+    for await (const entry of dir.values()) {
+      if (entry.kind === 'directory') {
+        await collect(entry);
+      } else {
+        files.push(await entry.getFile());
+      }
+    }
+  };
+  try {
+    await collect(dirHandle);
+  } catch (err) {
+    alert('フォルダを読み込めませんでした: ' + err.message);
+    return;
+  }
+  await importToLibrary(files);
+}
+
 function initBrowserLibraryUI() {
   const faccess = document.getElementById('faccess-supported-container');
   const unsupported = document.getElementById('faccess-unsupported-msg');
@@ -2802,7 +2838,7 @@ function initBrowserLibraryUI() {
   const btnAddFiles = document.getElementById('btn-library-add-files');
   if (btnAddFiles) btnAddFiles.addEventListener('click', () => filesInput.click());
   const btnAddDir = document.getElementById('btn-library-add-dir');
-  if (btnAddDir) btnAddDir.addEventListener('click', () => dirInput.click());
+  if (btnAddDir) btnAddDir.addEventListener('click', pickFolderToLibrary);
 
   const clearFolderBtn = document.getElementById('btn-library-clear-folder');
   if (clearFolderBtn) {
