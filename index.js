@@ -1,13 +1,22 @@
 // --- Load OBS modes immediately to prevent flashing ---
+// 保存済みの設定を返す。ブラウザライブラリ利用時（GitHub Pages など）は config.js が書き換えられないため localStorage を優先する
+function readSavedConfig() {
+  let stored = null;
+  try {
+    const rawData = localStorage.getItem('bgm_clock_config');
+    if (rawData) stored = JSON.parse(rawData);
+  } catch (e) {
+    console.error('Failed to read config from localStorage:', e);
+  }
+  if (window.ClockLibrary && window.ClockLibrary.isActive) {
+    return stored || window.bgmClockConfig || null;
+  }
+  return window.bgmClockConfig || stored;
+}
+
 (function applyInitialOBSModes() {
   try {
-    let data = window.bgmClockConfig;
-    if (!data) {
-      const rawData = localStorage.getItem('bgm_clock_config');
-      if (rawData) {
-        data = JSON.parse(rawData);
-      }
-    }
+    const data = readSavedConfig();
     if (data) {
       if (data.obsTransparent) {
         document.body.classList.add('transparent-mode');
@@ -72,6 +81,9 @@ let bgmManifest = {
 };
 
 let appFolderHandle = null;
+const useBrowserLibrary = !!(window.ClockLibrary && window.ClockLibrary.isActive);
+// obs.html（ブラウザソース）は再生役、index.html（ドック）は操作役
+const isPlayerRole = document.body.dataset.role === 'player';
 const isFileSystemAccessSupported = typeof window.showDirectoryPicker === 'function';
 
 let cfgObsTransparent = false;
@@ -267,9 +279,9 @@ function loadPresetsList() {
 }
 
 // --- Init & Load ---
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   // 1. Load BGM playlist manifest
-  loadBgmManifest();
+  await loadBgmManifest();
 
   // Initialize custom dropdowns
   presetSelect = createCustomDropdown('custom-preset-select', (selected) => {
@@ -329,7 +341,11 @@ window.addEventListener('DOMContentLoaded', () => {
   loadConfig();
   
   // Initialize folder connection for serverless copy
-  initFolderConnection();
+  if (useBrowserLibrary) {
+    initBrowserLibraryUI();
+  } else {
+    initFolderConnection();
+  }
 
   // 3. Load presets list
   loadPresetsList();
@@ -367,7 +383,12 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // 8. Check initial time zone immediately
-  updateActiveTimeZone(true);
+  // 操作役は再生役（OBS のブラウザソース）が居るか確かめてから鳴らす
+  initSync();
+  if (!isPlayerRole && syncChannel) {
+    await new Promise(resolve => setTimeout(resolve, 400));
+  }
+  updateActiveTimeZone(!isRemoteActive());
   
   // --- Preset Event Listeners ---
   if (btnSavePreset) {
@@ -454,7 +475,11 @@ function applyOBSModes() {
 }
 
 // Load manifest variables from bgm_manifest.js
-function loadBgmManifest() {
+async function loadBgmManifest() {
+  if (useBrowserLibrary) {
+    bgmManifest = await ClockLibrary.loadManifest();
+    return;
+  }
   if (window.bgmManifest) {
     bgmManifest = {
       bgmA: window.bgmManifest.bgmA || [],
@@ -557,15 +582,7 @@ function triggerDiskSave(configData) {
 // Load settings
 function loadConfig() {
   try {
-    let data = window.bgmClockConfig;
-    if (!data) {
-      const rawData = localStorage.getItem('bgm_clock_config');
-      if (rawData) {
-        data = JSON.parse(rawData);
-      } else {
-        data = DEFAULT_CONFIG;
-      }
-    }
+    const data = readSavedConfig() || DEFAULT_CONFIG;
 
     if (data.segments && Array.isArray(data.segments)) {
       segments = data.segments.map(s => ({
@@ -880,11 +897,14 @@ function playNextTrack(immediateStart = false) {
 
   const file = currentPlaylist[currentTrackIndex];
   
-  const playTrack = () => {
+  if (isRemoteActive()) return;
+
+  const playTrack = async () => {
     try {
       if (fadeIntervalId) clearInterval(fadeIntervalId);
-      audio.src = file.path;
+      audio.src = useBrowserLibrary ? await ClockLibrary.getTrackUrl(file.path) : file.path;
       updateTrackTitleDisplay(file);
+      broadcastPlayerState();
 
       
       audio.volume = 0;
@@ -913,7 +933,7 @@ function playNextTrack(immediateStart = false) {
     } catch (e) {
       console.error('Error starting play:', e);
       currentTrackIndex++;
-      playNextTrack(immediateStart);
+      if (currentTrackIndex < currentPlaylist.length) playNextTrack(immediateStart);
     }
   };
 
@@ -984,6 +1004,10 @@ function setPlayingUI(playing) {
 
 // Media Controls Actions
 btnPlay.addEventListener('click', () => {
+  if (isRemoteActive()) {
+    sendRemoteCommand('toggle');
+    return;
+  }
   if (audio.paused) {
     if (audio.src) {
       audio.volume = 0;
@@ -1017,6 +1041,10 @@ btnPlay.addEventListener('click', () => {
 
 
 btnNext.addEventListener('click', () => {
+  if (isRemoteActive()) {
+    sendRemoteCommand('next');
+    return;
+  }
   if (currentPlaylist.length > 0) {
     currentTrackIndex++;
     playNextTrack(true);
@@ -1024,6 +1052,10 @@ btnNext.addEventListener('click', () => {
 });
 
 btnPrev.addEventListener('click', () => {
+  if (isRemoteActive()) {
+    sendRemoteCommand('prev');
+    return;
+  }
   if (currentPlaylist.length > 0) {
     currentTrackIndex--;
     if (currentTrackIndex < 0) {
@@ -1056,11 +1088,15 @@ function updateProgressBar() {
 
 if (progressWrapper) {
   progressWrapper.addEventListener('click', (e) => {
-    if (!audio.duration) return;
     const rect = progressWrapper.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const width = rect.width;
     const pct = clickX / width;
+    if (isRemoteActive()) {
+      sendRemoteCommand('seek', pct);
+      return;
+    }
+    if (!audio.duration) return;
     audio.currentTime = pct * audio.duration;
   });
 }
@@ -1554,7 +1590,8 @@ function openPlaylistModal() {
   } else {
     currentPlaylist.forEach((file, idx) => {
       const item = document.createElement('div');
-      item.className = `modal-playlist-item ${idx === currentTrackIndex ? 'active-track' : ''}`;
+      const isActiveTrack = isRemoteActive() ? (remoteState && file.path === remoteState.path) : idx === currentTrackIndex;
+      item.className = `modal-playlist-item ${isActiveTrack ? 'active-track' : ''}`;
       
       const titleSpan = document.createElement('span');
       const displayName = (file.artist && file.title) ? `${file.title} - ${file.artist}` : file.name.replace(/\.[^/.]+$/, "");
@@ -1589,6 +1626,11 @@ function closePlaylistModal() {
 
 function playTrackByIndex(index) {
   if (index < 0 || index >= currentPlaylist.length) return;
+  if (isRemoteActive()) {
+    sendRemoteCommand('play-path', currentPlaylist[index].path);
+    setTimeout(openPlaylistModal, 300);
+    return;
+  }
   currentTrackIndex = index;
   
   playNextTrack(true);
@@ -2487,3 +2529,15 @@ function finishProgressModal() {
   }
 }
 
+
+// --- Dock ⇄ Browser Source Sync (作業中: 方式確定までの仮実装。現状は同期なしで従来どおり動く) ---
+let syncChannel = null;
+let remoteState = null;
+function isRemoteActive() { return false; }
+function sendRemoteCommand() {}
+function broadcastPlayerState() {}
+function initSync() {}
+function initBrowserLibraryUI() {
+  const connSection = document.getElementById('folder-connection-section');
+  if (connSection) connSection.style.display = 'none';
+}
