@@ -30,6 +30,7 @@
     <section class="player-section">
       <div class="track-info">
         <h2 id="track-title" class="track-title">再生中の曲はありません</h2>
+        <button id="btn-library-permit" class="action-btn library-permit" hidden>フォルダの読み取りを許可</button>
         <div id="track-folder" class="track-folder" style="cursor: pointer;" title="プレイリストを見る">
           <svg class="icon-svg" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6 10H8v-2h6v2zm4-4H8v-2h10v2z"/></svg>
           <span id="track-folder-name">フォルダ未設定</span>
@@ -185,11 +186,16 @@
           <div id="library-container" style="display: none;">
             <div class="library-actions">
               <button id="btn-library-add-files" class="action-btn">曲を追加</button>
-              <button id="btn-library-add-dir" class="action-btn">フォルダから追加</button>
+              <button id="btn-library-link-dir" class="action-btn">フォルダを指定</button>
+              <button id="btn-library-add-dir" class="action-btn" hidden>フォルダから追加</button>
               <span id="library-progress"></span>
             </div>
             <input type="file" id="library-files-input" accept=".mp3,.wav,.ogg,.m4a,.aac,.flac,audio/*" multiple hidden>
             <input type="file" id="library-dir-input" webkitdirectory multiple hidden>
+            <div id="library-link-row" class="library-link-row" hidden>
+              <span id="library-link-name"></span>
+              <button id="btn-library-unlink" class="library-link">解除</button>
+            </div>
             <ul id="library-files-list" class="library-files"></ul>
             <div class="library-footer">
               <span id="library-usage"></span>
