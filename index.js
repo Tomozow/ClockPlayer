@@ -2045,21 +2045,31 @@ async function deleteFileFromFolder(folderPath, fileName) {
 
 async function connectAppFolder() {
   try {
-    const handle = await window.showDirectoryPicker();
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    let hasIndex = false;
     let hasManifest = false;
-    let hasBgm = false;
     for await (const entry of handle.values()) {
-      if (entry.name === 'bgm_manifest.js') hasManifest = true;
-      if (entry.name === 'bgm' && entry.kind === 'directory') hasBgm = true;
+      if (entry.name === 'index.html' && entry.kind === 'file') hasIndex = true;
+      if (entry.name === 'bgm_manifest.js' && entry.kind === 'file') hasManifest = true;
     }
 
-    if (!hasManifest || !hasBgm) {
-      alert('選択されたフォルダは本アプリのルートフォルダではない可能性があります。「bgm_manifest.js」と「bgm」フォルダが含まれているか確認してください。');
+    if (!hasIndex) {
+      alert(`「${handle.name}」には index.html がありません。Clock Player の index.html が入っているフォルダを選んでください。`);
       return;
+    }
+
+    // ダウンロード直後は bgm フォルダと bgm_manifest.js が無いので、ここで用意する
+    const bgmDir = await handle.getDirectoryHandle('bgm', { create: true });
+    for (const folder of ['bgmA', 'bgmB', 'bgmC', 'bgmD', 'bgmE', 'bgmF']) {
+      await bgmDir.getDirectoryHandle(folder, { create: true });
     }
 
     await saveHandleToIndexedDB(handle);
     appFolderHandle = handle;
+    if (!hasManifest) {
+      await rebuildBgmManifest();
+      for (const s of segments) loadFilesForSegment(s);
+    }
     updateFolderConnectionUI(true);
     await saveConfig();
   } catch (err) {
