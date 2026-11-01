@@ -37,6 +37,36 @@ window.ClockLibrary = (() => {
     }
   }
 
+  async function fileExists(path) {
+    try {
+      const parts = path.split('/');
+      let dir = await navigator.storage.getDirectory();
+      for (const part of parts.slice(0, -1)) {
+        dir = await dir.getDirectoryHandle(part);
+      }
+      await dir.getFileHandle(parts[parts.length - 1]);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // 曲リストからファイルの無い記録を取り除く（旧版の記録や、別の画面で消された曲など）。取り除いた件数を返す
+  async function pruneMissing() {
+    const manifest = await loadManifest();
+    let removed = 0;
+    for (const folder of FOLDERS) {
+      const kept = [];
+      for (const entry of manifest[folder]) {
+        if (await fileExists(entry.path)) kept.push(entry);
+        else removed++;
+      }
+      manifest[folder] = kept;
+    }
+    if (removed > 0) await saveManifest(manifest);
+    return removed;
+  }
+
   async function saveManifest(manifest) {
     const root = await navigator.storage.getDirectory();
     const handle = await root.getFileHandle(MANIFEST_FILE, { create: true });
@@ -146,5 +176,5 @@ window.ClockLibrary = (() => {
     return currentObjectUrl;
   }
 
-  return { isSupported, isActive, loadManifest, importFiles, removeFile, clearFolder, clearAll, getUsage, getTrackUrl };
+  return { isSupported, isActive, loadManifest, pruneMissing, importFiles, removeFile, clearFolder, clearAll, getUsage, getTrackUrl };
 })();

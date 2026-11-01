@@ -477,6 +477,7 @@ function applyOBSModes() {
 // Load manifest variables from bgm_manifest.js
 async function loadBgmManifest() {
   if (useBrowserLibrary) {
+    if (!isPlayerRole) await ClockLibrary.pruneMissing();
     bgmManifest = await ClockLibrary.loadManifest();
     return;
   }
@@ -884,6 +885,16 @@ function shuffleArray(array) {
   }
 }
 
+// ファイルの無い曲をまとめて曲リストから外し、他の画面にも知らせる（連続で失敗しても1回にまとめる）
+let pruneTimer = null;
+function schedulePruneMissing() {
+  if (pruneTimer) return;
+  pruneTimer = setTimeout(async () => {
+    pruneTimer = null;
+    if (await ClockLibrary.pruneMissing() > 0) notifyLibraryUpdated();
+  }, 500);
+}
+
 // Smoothly fade out and play next track
 function playNextTrack(immediateStart = false) {
   if (currentPlaylist.length === 0) return;
@@ -901,6 +912,7 @@ function playNextTrack(immediateStart = false) {
   
   if (isRemoteActive()) return;
 
+  const playlistAtStart = currentPlaylist;
   const playTrack = async () => {
     try {
       if (fadeIntervalId) clearInterval(fadeIntervalId);
@@ -933,6 +945,26 @@ function playNextTrack(immediateStart = false) {
         setPlayingUI(false);
       });
     } catch (e) {
+      // 読み込み中にプレイリストが作り直されていたら、この失敗は古いので無視する
+      if (currentPlaylist !== playlistAtStart) return;
+      if (e.name === 'NotFoundError' && useBrowserLibrary) {
+        // 曲リストにあるのにファイルが無い。リストから外して次の曲へ
+        console.warn('Track file missing, removing from list:', file.path);
+        const idx = currentPlaylist.indexOf(file);
+        if (idx !== -1) currentPlaylist.splice(idx, 1);
+        currentTrackIndex = idx !== -1 ? idx : currentTrackIndex;
+        for (const s of segments) s.files = s.files.filter(f => f.path !== file.path);
+        schedulePruneMissing();
+        if (currentPlaylist.length > 0) {
+          if (currentTrackIndex >= currentPlaylist.length) currentTrackIndex = 0;
+          playNextTrack(immediateStart);
+        } else {
+          audio.removeAttribute('src');
+          setPlayingUI(false);
+          if (trackTitle) trackTitle.textContent = '曲が登録されていません';
+        }
+        return;
+      }
       console.error('Error starting play:', e);
       currentTrackIndex++;
       if (currentTrackIndex < currentPlaylist.length) playNextTrack(immediateStart);
@@ -976,7 +1008,7 @@ function fadeAndStop() {
         clearInterval(fadeIntervalId);
         fadeIntervalId = null;
         audio.pause();
-        audio.src = '';
+        audio.removeAttribute('src');
         setPlayingUI(false);
         audio.volume = isMuted ? 0 : globalVolume;
       } else {
@@ -985,7 +1017,7 @@ function fadeAndStop() {
     }, fadeInterval);
   } else {
     audio.pause();
-    audio.src = '';
+    audio.removeAttribute('src');
     setPlayingUI(false);
     audio.volume = isMuted ? 0 : globalVolume;
   }
@@ -1011,7 +1043,7 @@ btnPlay.addEventListener('click', () => {
     return;
   }
   if (audio.paused) {
-    if (audio.src) {
+    if (audio.getAttribute('src')) {
       audio.volume = 0;
       audio.play().then(() => {
         setPlayingUI(true);
@@ -1031,6 +1063,11 @@ btnPlay.addEventListener('click', () => {
             audio.volume = currentVol;
           }
         }, fadeInterval);
+      }).catch(err => {
+        // 読み込めない音声が残っていた場合は、今の時間帯の曲を選び直す
+        console.warn('Resume failed, restarting playlist:', err);
+        audio.removeAttribute('src');
+        updateActiveTimeZone(true);
       });
     } else {
       updateActiveTimeZone(true);
@@ -2571,7 +2608,7 @@ function broadcastPlayerState() {
   const file = currentPlaylist[currentTrackIndex] || null;
   syncChannel.postMessage({
     type: 'state',
-    file: file && !audio.src ? null : file,
+    file: file && !audio.getAttribute('src') ? null : file,
     currentTime: audio.currentTime || 0,
     duration: audio.duration || 0,
     playing: !audio.paused
@@ -2652,7 +2689,7 @@ function applyExternalConfig() {
       activePeriodName.textContent = `${newSeg.name} (${formatTime(newSeg.start)} - ${formatTime(newSeg.end)})`;
     }
     if (isShuffle !== prevShuffle && newSeg.files.length > 0) {
-      const playingPath = audio.src ? (currentPlaylist[currentTrackIndex] || {}).path : null;
+      const playingPath = audio.getAttribute('src') ? (currentPlaylist[currentTrackIndex] || {}).path : null;
       buildPlaylistForSegment(newSeg);
       const idx = currentPlaylist.findIndex(f => f.path === playingPath);
       if (idx !== -1) currentTrackIndex = idx;
@@ -2670,7 +2707,7 @@ async function applyLibraryUpdate() {
 
   const activeSeg = segments[activeSegmentIndex];
   if (!activeSeg || isRemoteActive()) return;
-  const playingPath = audio.src ? (currentPlaylist[currentTrackIndex] || {}).path : null;
+  const playingPath = audio.getAttribute('src') ? (currentPlaylist[currentTrackIndex] || {}).path : null;
   const stillExists = playingPath && activeSeg.files.some(f => f.path === playingPath);
   if (!stillExists) {
     // 再生中の曲が消えた・曲が無かった時間帯に曲が入った場合は選び直す
