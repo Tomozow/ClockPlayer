@@ -1399,6 +1399,44 @@ html.dock-mode .volume-container .control-btn {
 html.dock-mode .volume-slider {
   width: 80px;
 }
-#library-usage.library-usage-warn {
-  color: #e0a040;
+
+/* --- ブラウザソースと設定ファイル（横並び、狭いときは縦） --- */
+.share-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 15px;
+}
+.share-sections .source-url {
+  margin-top: 0;
+}
+.settings-file-row .input-label {
+  margin-right: auto;
+}
+.restore-panel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--glass-border);
+}
+.restore-panel[hidden] {
+  display: none;
+}
+.restore-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+.restore-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.restore-actions .action-btn {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 0.8rem;
 }

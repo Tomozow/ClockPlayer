@@ -447,6 +447,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   initSourceUrl();
+  initSettingsFile();
 
   // --- Folder Connection & Copy Event Listeners ---
   const btnConnect = document.getElementById('btn-connect-folder');
@@ -1542,6 +1543,57 @@ if (btnExportTemplate) {
   });
 }
 
+// 時間帯の配列（旧形式のテンプレート）を検証して適用する。不正なら例外
+function applySegmentTemplate(parsed) {
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    throw new Error('テンプレートの形式が正しくありません (配列ではありません)');
+  }
+  
+  const validatedSegments = [];
+  parsed.sort((a, b) => a.start - b.start);
+  
+  for (let i = 0; i < parsed.length; i++) {
+    const s = parsed[i];
+    if (typeof s.name !== 'string' || typeof s.start !== 'number' || typeof s.end !== 'number' || typeof s.color !== 'string') {
+      throw new Error(`時間帯データが破損しているか、必要なプロパティが不足しています (index: ${i})`);
+    }
+    
+    validatedSegments.push({
+      id: (Date.now() + i).toString(),
+      name: s.name,
+      start: s.start,
+      end: s.end,
+      color: s.color,
+      folderPath: s.folderPath || '',
+      files: []
+    });
+  }
+  
+  if (validatedSegments[0].start !== 0 || validatedSegments[validatedSegments.length - 1].end !== 1440) {
+    throw new Error('スケジュールは00:00から始まり、24:00で終わる必要があります');
+  }
+  
+  for (let i = 0; i < validatedSegments.length - 1; i++) {
+    if (validatedSegments[i].end !== validatedSegments[i + 1].start) {
+      throw new Error('時間帯の間に隙間や重複があります');
+    }
+    if (validatedSegments[i].end - validatedSegments[i].start < MIN_SEGMENT_DURATION) {
+      throw new Error(`各時間帯は最低${MIN_SEGMENT_DURATION}分以上である必要があります`);
+    }
+  }
+  
+  segments = validatedSegments;
+  
+  for (let s of segments) {
+    loadFilesForSegment(s);
+  }
+  
+  saveConfig();
+  
+  selectSegment(0);
+  updateActiveTimeZone(true);
+}
+
 // Open file dialog when import button clicked
 if (btnImportTemplate && templateFileInput) {
   btnImportTemplate.addEventListener('click', () => {
@@ -1557,54 +1609,7 @@ if (btnImportTemplate && templateFileInput) {
     reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target.result);
-        
-        if (!Array.isArray(parsed) || parsed.length === 0) {
-          throw new Error('テンプレートの形式が正しくありません (配列ではありません)');
-        }
-        
-        const validatedSegments = [];
-        parsed.sort((a, b) => a.start - b.start);
-        
-        for (let i = 0; i < parsed.length; i++) {
-          const s = parsed[i];
-          if (typeof s.name !== 'string' || typeof s.start !== 'number' || typeof s.end !== 'number' || typeof s.color !== 'string') {
-            throw new Error(`時間帯データが破損しているか、必要なプロパティが不足しています (index: ${i})`);
-          }
-          
-          validatedSegments.push({
-            id: (Date.now() + i).toString(),
-            name: s.name,
-            start: s.start,
-            end: s.end,
-            color: s.color,
-            folderPath: s.folderPath || '',
-            files: []
-          });
-        }
-        
-        if (validatedSegments[0].start !== 0 || validatedSegments[validatedSegments.length - 1].end !== 1440) {
-          throw new Error('スケジュールは00:00から始まり、24:00で終わる必要があります');
-        }
-        
-        for (let i = 0; i < validatedSegments.length - 1; i++) {
-          if (validatedSegments[i].end !== validatedSegments[i + 1].start) {
-            throw new Error('時間帯の間に隙間や重複があります');
-          }
-          if (validatedSegments[i].end - validatedSegments[i].start < MIN_SEGMENT_DURATION) {
-            throw new Error(`各時間帯は最低${MIN_SEGMENT_DURATION}分以上である必要があります`);
-          }
-        }
-        
-        segments = validatedSegments;
-        
-        for (let s of segments) {
-          loadFilesForSegment(s);
-        }
-        
-        saveConfig();
-        
-        selectSegment(0);
-        updateActiveTimeZone(true);
+        applySegmentTemplate(parsed);
         
         alert('テンプレートが正常にロードされました！');
       } catch (err) {
@@ -2845,11 +2850,7 @@ function formatBytes(bytes) {
 async function refreshLibraryUsage() {
   const usageEl = document.getElementById('library-usage');
   if (!usageEl) return;
-  const usage = await ClockLibrary.getUsage();
-  const persisted = usage === 0 || await ClockLibrary.isPersisted();
-  usageEl.textContent = persisted ? formatBytes(usage) : `${formatBytes(usage)}・消える可能性あり`;
-  usageEl.classList.toggle('library-usage-warn', !persisted);
-  usageEl.title = persisted ? '' : 'ディスクの空きが少なくなると、ブラウザが取り込んだ曲を削除することがあります';
+  usageEl.textContent = formatBytes(await ClockLibrary.getUsage());
 }
 
 function renderLibraryList() {
@@ -2916,23 +2917,31 @@ async function pickFolderToLibrary() {
     document.getElementById('library-dir-input').click();
     return;
   }
-  const files = [];
-  const collect = async (dir) => {
-    for await (const entry of dir.values()) {
-      if (entry.kind === 'directory') {
-        await collect(entry);
-      } else {
-        files.push(await entry.getFile());
-      }
-    }
-  };
+  let items;
   try {
-    await collect(dirHandle);
+    items = await collectDirectory(dirHandle);
   } catch (err) {
     alert('フォルダを読み込めませんでした: ' + err.message);
     return;
   }
-  await importToLibrary(files);
+  await importToLibrary(items);
+}
+
+// フォルダ内のファイルを、取り込み元（選んだフォルダ名とその中での位置）付きで集める
+async function collectDirectory(dirHandle) {
+  const items = [];
+  const walk = async (dir, prefix) => {
+    for await (const entry of dir.values()) {
+      const relPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.kind === 'directory') {
+        await walk(entry, relPath);
+      } else {
+        items.push({ file: await entry.getFile(), source: { root: dirHandle.name, relPath } });
+      }
+    }
+  };
+  await walk(dirHandle, '');
+  return items;
 }
 
 function initBrowserLibraryUI() {
@@ -2978,4 +2987,242 @@ function initBrowserLibraryUI() {
   }
 
   renderLibraryList();
+}
+
+// --- 設定ファイルの保存・読み込み（ブラウザソースの隣） ---
+// 時間帯・表示設定・プリセットと、プレイリスト（曲の一覧と取り込み元）を1つの JSON に書き出す。
+// 曲そのものは含まないので、読み込み後に足りない曲は取り込み元のフォルダを選んで取り込み直す。
+const RESTORE_KEY = 'clockplayer_pending_restore';
+
+function readPresets() {
+  try {
+    return JSON.parse(localStorage.getItem('bgm_clock_presets') || '{}');
+  } catch (e) {
+    return {};
+  }
+}
+
+async function saveSettingsFile() {
+  saveConfig();
+  const data = {
+    app: 'ClockPlayer',
+    format: 1,
+    savedAt: new Date().toISOString(),
+    config: window.bgmClockConfig,
+    presets: readPresets(),
+    playlist: useBrowserLibrary ? await ClockLibrary.loadManifest() : null
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date();
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  a.href = url;
+  a.download = `clockplayer_settings_${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function loadSettingsFile(file) {
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch (e) {
+    alert('設定ファイルを読み込めませんでした。');
+    return;
+  }
+
+  try {
+    // 旧形式（時間帯だけの配列）
+    if (Array.isArray(data)) {
+      applySegmentTemplate(data);
+      return;
+    }
+    if (!data || data.app !== 'ClockPlayer' || !data.config || !Array.isArray(data.config.segments)) {
+      throw new Error('Clock Player の設定ファイルではありません');
+    }
+
+    if (data.presets && typeof data.presets === 'object') {
+      localStorage.setItem('bgm_clock_presets', JSON.stringify(data.presets));
+      loadPresetsList();
+    }
+
+    localStorage.setItem('bgm_clock_config', JSON.stringify(data.config));
+    window.bgmClockConfig = data.config;
+    applyExternalConfig();
+    saveConfig();
+
+    if (useBrowserLibrary && data.playlist) {
+      await mergePlaylist(data.playlist);
+    }
+  } catch (err) {
+    console.error('Load settings failed:', err);
+    alert('設定ファイルを読み込めませんでした: ' + err.message);
+  }
+}
+
+// 手元にある曲は曲リストに戻し、無い曲は取り込み直し待ちにする
+async function mergePlaylist(playlist) {
+  const current = await ClockLibrary.loadManifest();
+  const pending = [];
+  for (const folder of Object.keys(current)) {
+    const entries = Array.isArray(playlist[folder]) ? playlist[folder] : [];
+    for (const entry of entries) {
+      if (!entry || !entry.name || !entry.path) continue;
+      if (current[folder].some(f => f.path === entry.path)) continue;
+      if (await ClockLibrary.fileExists(entry.path)) continue; // 次回の掃除で整合する
+      pending.push({ folder, name: entry.name, source: entry.source || { root: '', relPath: entry.name } });
+    }
+  }
+  savePendingRestore(pending);
+  renderRestorePanel();
+}
+
+function loadPendingRestore() {
+  try {
+    return JSON.parse(localStorage.getItem(RESTORE_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function savePendingRestore(pending) {
+  if (pending.length > 0) {
+    localStorage.setItem(RESTORE_KEY, JSON.stringify(pending));
+  } else {
+    localStorage.removeItem(RESTORE_KEY);
+  }
+}
+
+function renderRestorePanel() {
+  const panel = document.getElementById('restore-panel');
+  const actions = document.getElementById('restore-actions');
+  const summary = document.getElementById('restore-summary');
+  if (!panel || !actions || !summary) return;
+  const pending = loadPendingRestore();
+  panel.hidden = pending.length === 0;
+  if (pending.length === 0) return;
+
+  summary.textContent = `取り込み直しが必要な曲 ${pending.length} 曲`;
+  actions.innerHTML = '';
+  const groups = new Map();
+  pending.forEach(p => {
+    const root = (p.source && p.source.root) || '';
+    groups.set(root, (groups.get(root) || 0) + 1);
+  });
+  groups.forEach((count, root) => {
+    const btn = document.createElement('button');
+    btn.className = 'action-btn';
+    btn.textContent = root ? `📁 ${root} を選ぶ（${count}曲）` : `ファイルを選ぶ（${count}曲）`;
+    btn.addEventListener('click', () => (root ? restoreFromFolder(root) : restoreFromFiles()));
+    actions.appendChild(btn);
+  });
+}
+
+// 候補ファイルの中から、取り込み直し待ちの曲を位置→ファイル名の順で探して取り込む
+async function restoreFromCandidates(candidates, root) {
+  const pending = loadPendingRestore();
+  const byPath = new Map();
+  const byName = new Map();
+  candidates.forEach(c => {
+    byPath.set(c.source.relPath, c);
+    if (!byName.has(c.file.name)) byName.set(c.file.name, c);
+  });
+
+  const remaining = [];
+  const toImport = new Map(); // folder -> items
+  pending.forEach(p => {
+    const pRoot = (p.source && p.source.root) || '';
+    if (root !== null && pRoot !== root) {
+      remaining.push(p);
+      return;
+    }
+    const hit = byPath.get(p.source.relPath) || byName.get(p.name) || byName.get(p.source.relPath.split('/').pop());
+    if (!hit) {
+      remaining.push(p);
+      return;
+    }
+    if (!toImport.has(p.folder)) toImport.set(p.folder, []);
+    toImport.get(p.folder).push({ file: hit.file, source: p.source });
+  });
+
+  const progressEl = document.getElementById('restore-summary');
+  let done = 0;
+  const total = [...toImport.values()].reduce((n, list) => n + list.length, 0);
+  for (const [folder, items] of toImport) {
+    await ClockLibrary.importFiles(folder, items, extractAudioMetadata, () => {
+      done++;
+      if (progressEl) progressEl.textContent = `取り込み直し中 ${done} / ${total}`;
+    });
+  }
+  savePendingRestore(remaining);
+  notifyLibraryUpdated();
+  renderRestorePanel();
+  if (remaining.length > 0 && total === 0) {
+    alert('このフォルダには取り込み直す曲が見つかりませんでした。');
+  }
+}
+
+async function restoreFromFolder(root) {
+  if (typeof window.showDirectoryPicker !== 'function') {
+    pickRestoreInput(true, root);
+    return;
+  }
+  let dirHandle;
+  try {
+    dirHandle = await window.showDirectoryPicker({ id: 'clockplayer-import' });
+  } catch (err) {
+    if (err.name !== 'AbortError') pickRestoreInput(true, root);
+    return;
+  }
+  const items = (await collectDirectory(dirHandle)).map(c => ({ file: c.file, source: { root, relPath: c.source.relPath } }));
+  await restoreFromCandidates(items, root);
+}
+
+function restoreFromFiles() {
+  pickRestoreInput(false, '');
+}
+
+// showDirectoryPicker が使えないときのファイル選択
+function pickRestoreInput(directory, root) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  if (directory) input.webkitdirectory = true;
+  input.addEventListener('change', () => {
+    const items = Array.from(input.files).map(file => {
+      const rel = file.webkitRelativePath || '';
+      const relPath = rel.includes('/') ? rel.split('/').slice(1).join('/') : file.name;
+      return { file, source: { root, relPath } };
+    });
+    restoreFromCandidates(items, root);
+  });
+  input.click();
+}
+
+function initSettingsFile() {
+  const btnSave = document.getElementById('btn-settings-save');
+  const btnLoad = document.getElementById('btn-settings-load');
+  const input = document.getElementById('settings-file-input');
+  if (btnSave) btnSave.addEventListener('click', saveSettingsFile);
+  if (btnLoad && input) {
+    btnLoad.addEventListener('click', () => {
+      input.value = '';
+      input.click();
+    });
+    input.addEventListener('change', () => {
+      if (input.files[0]) loadSettingsFile(input.files[0]);
+    });
+  }
+  const btnDismiss = document.getElementById('btn-restore-dismiss');
+  if (btnDismiss) {
+    btnDismiss.addEventListener('click', () => {
+      if (!confirm('取り込み直し待ちの曲を一覧から消しますか？')) return;
+      savePendingRestore([]);
+      renderRestorePanel();
+    });
+  }
+  renderRestorePanel();
 }

@@ -91,13 +91,27 @@ window.ClockLibrary = (() => {
   }
 
   // files: File の配列。readMeta(file) は { artist, title } を返す関数
-  async function importFiles(folder, files, readMeta, onProgress) {
+  // 取り込み元。フォルダから取り込んだ曲は「選んだフォルダ名」と「その中での位置」を持つ。
+  // ブラウザは PC 上の完全なパスを教えないため、復元時は同じフォルダを選んでもらい、この位置で曲を探す
+  function sourceOf(file) {
+    const rel = file.webkitRelativePath || '';
+    if (rel.includes('/')) {
+      const parts = rel.split('/');
+      return { root: parts[0], relPath: parts.slice(1).join('/') };
+    }
+    return { root: '', relPath: file.name };
+  }
+
+  // items: File、または { file, source } の配列。readMeta(file) は { artist, title } を返す関数
+  async function importFiles(folder, items, readMeta, onProgress) {
     const dir = await getBgmDir(folder);
     const manifest = await loadManifest();
-    const audioFiles = Array.from(files).filter(f => AUDIO_PATTERN.test(f.name));
+    const audioItems = Array.from(items)
+      .map(item => (item instanceof Blob ? { file: item, source: sourceOf(item) } : item))
+      .filter(item => AUDIO_PATTERN.test(item.file.name));
 
-    for (let i = 0; i < audioFiles.length; i++) {
-      const file = audioFiles[i];
+    for (let i = 0; i < audioItems.length; i++) {
+      const { file, source } = audioItems[i];
       const name = await uniqueName(dir, file.name);
       const handle = await dir.getFileHandle(name, { create: true });
       // 曲全体をメモリに載せずに少しずつ書き込む（pipeTo が書き込み後に閉じる）
@@ -118,8 +132,8 @@ window.ClockLibrary = (() => {
         }
       }
 
-      manifest[folder].push({ name, path: `bgm/${folder}/${name}`, artist, title });
-      if (onProgress) onProgress(i + 1, audioFiles.length, file.name);
+      manifest[folder].push({ name, path: `bgm/${folder}/${name}`, artist, title, source });
+      if (onProgress) onProgress(i + 1, audioItems.length, file.name);
     }
 
     manifest[folder].sort((a, b) => a.name.localeCompare(b.name));
@@ -193,5 +207,5 @@ window.ClockLibrary = (() => {
     return currentObjectUrl;
   }
 
-  return { isSupported, isActive, loadManifest, pruneMissing, importFiles, removeFile, clearFolder, clearAll, getUsage, requestPersist, isPersisted, getTrackUrl };
+  return { isSupported, isActive, loadManifest, pruneMissing, importFiles, removeFile, clearFolder, clearAll, getUsage, requestPersist, isPersisted, fileExists, getTrackUrl };
 })();

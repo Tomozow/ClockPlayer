@@ -257,28 +257,32 @@
 
       </div>
       
-      <!-- Browser Source URL -->
-      <div class="source-url">
-        <div class="source-url-row">
-          <span class="input-label">ブラウザソース</span>
-          <input type="text" id="source-url" class="text-input" readonly>
-          <button id="btn-copy-source-url" class="action-btn">コピー</button>
+      <div class="share-sections">
+        <!-- Browser Source URL -->
+        <div class="source-url">
+          <div class="source-url-row">
+            <span class="input-label">ブラウザソース</span>
+            <input type="text" id="source-url" class="text-input" readonly>
+            <button id="btn-copy-source-url" class="action-btn">コピー</button>
+          </div>
+          <p class="source-url-help">追加したソースのプロパティで<strong>「OBSで音声を制御する」</strong>にチェックを入れてください。</p>
         </div>
-        <p class="source-url-help">追加したソースのプロパティで<strong>「OBSで音声を制御する」</strong>にチェックを入れてください。</p>
-      </div>
 
-      <!-- Backup & Restore (JSON) -->
-      <div id="backup-panel" class="debug-panel" style="margin-top: 15px;">
-        <div class="debug-row">
-          <span class="debug-title">プリセットのバックアップ</span>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <button id="btn-export-template" class="action-btn" style="height: 32px; padding: 0 12px; font-size: 0.85rem;" title="設定をファイル（JSON）としてバックアップ書き出し">
-              ファイルを書き出す
-            </button>
-            <button id="btn-import-template" class="action-btn" style="height: 32px; padding: 0 12px; font-size: 0.85rem;" title="バックアップファイル（JSON）を読み込み">
-              ファイルを取り込む
-            </button>
-            <input type="file" id="template-file-input" accept=".json" style="display: none;">
+        <!-- Settings file -->
+        <div class="source-url">
+          <div class="source-url-row settings-file-row">
+            <span class="input-label">設定ファイル</span>
+            <button id="btn-settings-save" class="action-btn">保存</button>
+            <button id="btn-settings-load" class="action-btn">読み込み</button>
+            <input type="file" id="settings-file-input" accept=".json,application/json" hidden>
+          </div>
+          <p class="source-url-help">時間帯・表示設定・プリセットに加えて、<strong>プレイリスト（曲の一覧と取り込み元）も保存します</strong>。曲そのものは含まれないため、読み込んだ後に取り込み元のフォルダを選ぶと曲を取り込み直します。</p>
+          <div id="restore-panel" class="restore-panel" hidden>
+            <div class="restore-head">
+              <span id="restore-summary"></span>
+              <button id="btn-restore-dismiss" class="library-link">破棄</button>
+            </div>
+            <div id="restore-actions" class="restore-actions"></div>
           </div>
         </div>
       </div>
