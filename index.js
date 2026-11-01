@@ -1216,6 +1216,10 @@ if (layoutMinimal) {
 
 function updateVolumeUI() {
   audio.volume = isMuted ? 0 : globalVolume;
+  if (isRemoteActive()) {
+    // ドックの音量操作はブラウザソースの再生に反映する
+    sendRemoteCommand('volume', { volume: globalVolume, muted: isMuted });
+  }
   
   if (!volumeIcon) return;
   if (isMuted || globalVolume === 0) {
@@ -2652,6 +2656,15 @@ function handleRemoteCommand(msg) {
     btnPrev.click();
   } else if (msg.action === 'seek') {
     if (audio.duration) audio.currentTime = msg.value * audio.duration;
+  } else if (msg.action === 'volume') {
+    globalVolume = msg.value.volume;
+    isMuted = msg.value.muted;
+    if (volumeSlider) volumeSlider.value = globalVolume;
+    if (fadeIntervalId) {
+      clearInterval(fadeIntervalId);
+      fadeIntervalId = null;
+    }
+    updateVolumeUI();
   } else if (msg.action === 'play-path') {
     const idx = currentPlaylist.findIndex(f => f.path === msg.value);
     if (idx !== -1) {

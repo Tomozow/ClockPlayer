@@ -1208,11 +1208,23 @@ body.minimal-mode .config-container {
 }
 
 /* --- ブラウザソース用 URL --- */
+.source-url {
+  margin-top: 15px;
+  padding: 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+}
 .source-url-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 20px;
+}
+.source-url-help {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-main);
+  line-height: 1.5;
 }
 .source-url-row .input-label {
   white-space: nowrap;
@@ -1252,7 +1264,6 @@ html.dock-mode .clock-section,
 html.dock-mode .config-toggle-absolute,
 html.dock-mode .track-folder,
 html.dock-mode .time-durations,
-html.dock-mode .volume-container,
 html.dock-mode #backup-panel,
 html.dock-mode #debug-time-panel,
 html.dock-mode .config-title {
@@ -1263,7 +1274,7 @@ html.dock-mode .player-section {
   grid-template-columns: 1fr auto;
   grid-template-areas:
     "info controls"
-    "progress progress";
+    "progress volume";
   align-items: center;
   column-gap: 8px;
   row-gap: 6px;
@@ -1374,4 +1385,17 @@ html.dock-mode #btn-delete-segment {
 html.dock-mode #folder-connection-section {
   margin-top: 10px !important;
   padding-top: 10px !important;
+}
+html.dock-mode .volume-container {
+  grid-area: volume;
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+}
+html.dock-mode .volume-container .control-btn {
+  width: 28px !important;
+  height: 28px !important;
+}
+html.dock-mode .volume-slider {
+  width: 80px;
 }
