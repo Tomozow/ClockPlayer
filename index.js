@@ -735,8 +735,6 @@ function handleActiveSegmentChange(oldIndex, newIndex, forcePlay) {
     // 再生中の時間帯切替、または再生ボタンからの明示的な要求の場合だけ再生する
     if (wasPlaying || forcePlay) {
       playNextTrack(true); // Switch & play immediately
-    } else if (trackTitle && trackTitle.textContent === '曲が登録されていません') {
-      trackTitle.textContent = '再生中の曲はありません';
     }
   }
 }
@@ -933,15 +931,6 @@ function playNextTrack(immediateStart = false) {
         setPlayingUI(false);
       });
     } catch (e) {
-      if (e.name === 'NotAllowedError') {
-        // 指定フォルダの読み取り許可待ち。許可されるとライブラリ更新の通知で再開する
-        audio.removeAttribute('src');
-        setPlayingUI(false);
-        if (trackTitle) trackTitle.textContent = isPlayerRole ? 'ドックでフォルダの読み取りを許可してください' : 'フォルダの読み取りを許可してください';
-        if (!isPlayerRole) refreshPermitButton();
-        broadcastPlayerState();
-        return;
-      }
       console.error('Error starting play:', e);
       currentTrackIndex++;
       if (currentTrackIndex < currentPlaylist.length) playNextTrack(immediateStart);
@@ -2693,38 +2682,9 @@ function initSync() {
   if (typeof BroadcastChannel !== 'function') return;
   syncChannel = new BroadcastChannel(SYNC_CHANNEL_NAME);
 
-  const pendingFiles = new Map();
-  if (isPlayerRole && useBrowserLibrary) {
-    ClockLibrary.setRelay(path => new Promise((resolve, reject) => {
-      const id = `${Date.now()}-${Math.random()}`;
-      const timer = setTimeout(() => {
-        pendingFiles.delete(id);
-        const err = new Error('ドックから曲を受け取れませんでした');
-        err.name = 'NotAllowedError';
-        reject(err);
-      }, 4000);
-      pendingFiles.set(id, file => {
-        clearTimeout(timer);
-        pendingFiles.delete(id);
-        resolve(file);
-      });
-      syncChannel.postMessage({ type: 'file-request', id, path });
-    }));
-  }
-
-  syncChannel.addEventListener('message', async (e) => {
+  syncChannel.addEventListener('message', (e) => {
     const msg = e.data || {};
-    if (msg.type === 'file-request' && !isPlayerRole && useBrowserLibrary) {
-      // ブラウザソースの代わりに指定フォルダの曲を読んで渡す（ファイルはコピーされず参照で渡る）
-      try {
-        const file = await ClockLibrary.readFile(msg.path);
-        syncChannel.postMessage({ type: 'file-response', id: msg.id, file });
-      } catch (err) {
-        if (err.name === 'NotAllowedError') refreshPermitButton();
-      }
-    } else if (msg.type === 'file-response' && pendingFiles.has(msg.id)) {
-      pendingFiles.get(msg.id)(msg.file);
-    } else if (msg.type === 'hello' && isPlayerRole) {
+    if (msg.type === 'hello' && isPlayerRole) {
       broadcastPlayerState();
     } else if (msg.type === 'state' && !isPlayerRole) {
       renderRemoteState(msg);
@@ -2785,11 +2745,6 @@ function renderLibraryList() {
     li.className = 'library-file';
     const name = document.createElement('span');
     name.textContent = file.name;
-    li.appendChild(name);
-    if (ClockLibrary.isLinkedPath(file.path)) {
-      listEl.appendChild(li);
-      return;
-    }
     const del = document.createElement('button');
     del.className = 'library-delete';
     del.textContent = '✕';
@@ -2798,57 +2753,17 @@ function renderLibraryList() {
       await ClockLibrary.removeFile(activeSeg.folderPath, file.name);
       notifyLibraryUpdated();
     });
+    li.appendChild(name);
     li.appendChild(del);
     listEl.appendChild(li);
   });
 
-  const copiedCount = files.filter(f => !ClockLibrary.isLinkedPath(f.path)).length;
   const clearFolderBtn = document.getElementById('btn-library-clear-folder');
   if (clearFolderBtn) {
     clearFolderBtn.textContent = `${activeSeg.folderPath} を空にする`;
-    clearFolderBtn.disabled = copiedCount === 0;
+    clearFolderBtn.disabled = files.length === 0;
   }
   refreshLibraryUsage();
-  refreshLinkRow(activeSeg.folderPath);
-}
-
-async function refreshLinkRow(folder) {
-  const row = document.getElementById('library-link-row');
-  const nameEl = document.getElementById('library-link-name');
-  if (!row || !nameEl) return;
-  const linkedName = await ClockLibrary.getLinkedFolderName(folder);
-  row.hidden = !linkedName;
-  nameEl.textContent = linkedName || '';
-}
-
-async function refreshPermitButton() {
-  const btn = document.getElementById('btn-library-permit');
-  if (!btn) return;
-  btn.hidden = (await ClockLibrary.foldersNeedingPermission()).length === 0;
-}
-
-async function linkFolderToLibrary() {
-  const activeSeg = segments[selectedSegmentIndex];
-  if (!activeSeg || !activeSeg.folderPath) return;
-  let dirHandle;
-  try {
-    dirHandle = await window.showDirectoryPicker({ id: `clockplayer-${activeSeg.folderPath}` });
-  } catch (err) {
-    if (err.name !== 'AbortError') alert('フォルダを開けませんでした: ' + err.message);
-    return;
-  }
-  const progressEl = document.getElementById('library-progress');
-  try {
-    await ClockLibrary.linkFolder(activeSeg.folderPath, dirHandle, extractAudioMetadata, (done) => {
-      if (progressEl) progressEl.textContent = `${done}`;
-    });
-  } catch (err) {
-    console.error('Library link failed:', err);
-    alert('フォルダの読み込みに失敗しました: ' + err.message);
-  }
-  if (progressEl) progressEl.textContent = '';
-  refreshPermitButton();
-  notifyLibraryUpdated();
 }
 
 async function importToLibrary(fileList) {
@@ -2887,35 +2802,7 @@ function initBrowserLibraryUI() {
   const btnAddFiles = document.getElementById('btn-library-add-files');
   if (btnAddFiles) btnAddFiles.addEventListener('click', () => filesInput.click());
   const btnAddDir = document.getElementById('btn-library-add-dir');
-  const btnLinkDir = document.getElementById('btn-library-link-dir');
-  // フォルダ指定（コピーしない）が使えないブラウザでは、フォルダごとコピーで代替する
-  if (btnAddDir) {
-    btnAddDir.hidden = ClockLibrary.canLinkFolder;
-    btnAddDir.addEventListener('click', () => dirInput.click());
-  }
-  if (btnLinkDir) {
-    btnLinkDir.hidden = !ClockLibrary.canLinkFolder;
-    btnLinkDir.addEventListener('click', linkFolderToLibrary);
-  }
-  const btnUnlink = document.getElementById('btn-library-unlink');
-  if (btnUnlink) {
-    btnUnlink.addEventListener('click', async () => {
-      const activeSeg = segments[selectedSegmentIndex];
-      if (!activeSeg) return;
-      await ClockLibrary.unlinkFolder(activeSeg.folderPath);
-      refreshPermitButton();
-      notifyLibraryUpdated();
-    });
-  }
-  const btnPermit = document.getElementById('btn-library-permit');
-  if (btnPermit) {
-    btnPermit.addEventListener('click', async () => {
-      await ClockLibrary.requestPermissions();
-      await refreshPermitButton();
-      notifyLibraryUpdated();
-    });
-  }
-  refreshPermitButton();
+  if (btnAddDir) btnAddDir.addEventListener('click', () => dirInput.click());
 
   const clearFolderBtn = document.getElementById('btn-library-clear-folder');
   if (clearFolderBtn) {
@@ -2929,7 +2816,7 @@ function initBrowserLibraryUI() {
   const clearAllBtn = document.getElementById('btn-library-clear-all');
   if (clearAllBtn) {
     clearAllBtn.addEventListener('click', async () => {
-      if (!confirm('コピーして取り込んだ曲をすべて削除しますか？（指定したフォルダの曲は削除されません）')) return;
+      if (!confirm('取り込んだ曲をすべて削除しますか？')) return;
       await ClockLibrary.clearAll();
       notifyLibraryUpdated();
     });

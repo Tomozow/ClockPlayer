@@ -1206,30 +1206,3 @@ body.minimal-mode .config-container {
   cursor: default;
   text-decoration: none;
 }
-.library-actions .action-btn[hidden],
-.library-permit[hidden],
-.library-link-row[hidden] {
-  display: none;
-}
-.library-link-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 10px;
-  font-size: 0.8rem;
-}
-.library-link-row span {
-  flex: 1;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.library-link-row span::before {
-  content: '📁 ';
-}
-.library-permit {
-  margin-top: 6px;
-  height: 30px;
-  padding: 0 12px;
-  font-size: 0.8rem;
-}
