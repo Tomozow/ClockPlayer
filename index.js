@@ -14,10 +14,15 @@ function readSavedConfig() {
   return window.bgmClockConfig || stored;
 }
 
+// ドックでは OBS 向けの表示設定（透過・ミニマルなど）を自分には適用しない
+function isDockMode() {
+  return document.documentElement.classList.contains('dock-mode');
+}
+
 (function applyInitialOBSModes() {
   try {
     const data = readSavedConfig();
-    if (data) {
+    if (data && !isDockMode()) {
       if (data.obsTransparent) {
         document.body.classList.add('transparent-mode');
       }
@@ -355,7 +360,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   selectSegment(0);
 
   // Restore config panel open/close state
-  const configPanelOpen = localStorage.getItem('config_panel_open') === 'true';
+  const configPanelOpen = isDockMode() || localStorage.getItem('config_panel_open') === 'true';
   if (configPanelOpen && configContainer && btnToggleConfig) {
     configContainer.style.display = 'block';
     btnToggleConfig.classList.add('active-toggle');
@@ -441,6 +446,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  initSourceUrl();
+
   // --- Folder Connection & Copy Event Listeners ---
   const btnConnect = document.getElementById('btn-connect-folder');
   if (btnConnect) btnConnect.addEventListener('click', connectAppFolder);
@@ -467,11 +474,12 @@ function applyOBSModes() {
   if (layoutSwapPanels) cfgLayoutSwapPanels = layoutSwapPanels.checked;
   if (layoutMinimal) cfgLayoutMinimal = layoutMinimal.checked;
 
-  document.body.classList.toggle('transparent-mode', cfgObsTransparent);
-  document.body.classList.toggle('hide-controls-mode', cfgObsHideControls);
-  document.body.classList.toggle('keep-window-bg-mode', cfgObsKeepWindowBg);
-  document.body.classList.toggle('swap-panels-mode', cfgLayoutSwapPanels);
-  document.body.classList.toggle('minimal-mode', cfgLayoutMinimal);
+  const dock = isDockMode();
+  document.body.classList.toggle('transparent-mode', cfgObsTransparent && !dock);
+  document.body.classList.toggle('hide-controls-mode', cfgObsHideControls && !dock);
+  document.body.classList.toggle('keep-window-bg-mode', cfgObsKeepWindowBg && !dock);
+  document.body.classList.toggle('swap-panels-mode', cfgLayoutSwapPanels && !dock);
+  document.body.classList.toggle('minimal-mode', cfgLayoutMinimal && !dock);
 }
 
 // Load manifest variables from bgm_manifest.js
@@ -2583,6 +2591,26 @@ function finishProgressModal() {
   }
 }
 
+
+// --- ブラウザソース用 URL（設定パネル先頭） ---
+function initSourceUrl() {
+  const input = document.getElementById('source-url');
+  const btn = document.getElementById('btn-copy-source-url');
+  if (!input || !btn) return;
+  input.value = new URL('obs.html', location.href).href;
+  input.addEventListener('focus', () => input.select());
+  btn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(input.value);
+    } catch (e) {
+      // OBS のドックなどクリップボード API が使えない場合
+      input.select();
+      document.execCommand('copy');
+    }
+    btn.textContent = 'コピーしました';
+    setTimeout(() => { btn.textContent = 'コピー'; }, 1500);
+  });
+}
 
 // --- Dock ⇄ Browser Source Sync ---
 // OBS のカスタムブラウザドック（index.html）とブラウザソース（obs.html）は同じオリジンなら
