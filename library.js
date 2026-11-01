@@ -108,6 +108,31 @@ window.ClockLibrary = (() => {
     return manifest;
   }
 
+  async function clearFolder(folder) {
+    const bgm = await getBgmDir();
+    try { await bgm.removeEntry(folder, { recursive: true }); } catch (e) { /* 既に無い */ }
+    const manifest = await loadManifest();
+    manifest[folder] = [];
+    await saveManifest(manifest);
+    return manifest;
+  }
+
+  async function clearAll() {
+    const root = await navigator.storage.getDirectory();
+    try { await root.removeEntry('bgm', { recursive: true }); } catch (e) { /* 既に無い */ }
+    try { await root.removeEntry(MANIFEST_FILE); } catch (e) { /* 既に無い */ }
+    return emptyManifest();
+  }
+
+  async function getUsage() {
+    try {
+      const { usage } = await navigator.storage.estimate();
+      return usage || 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
   // 再生用の URL を返す。前回の URL は解放する
   async function getTrackUrl(path) {
     const parts = path.split('/');
@@ -121,5 +146,5 @@ window.ClockLibrary = (() => {
     return currentObjectUrl;
   }
 
-  return { isSupported, isActive, loadManifest, importFiles, removeFile, getTrackUrl };
+  return { isSupported, isActive, loadManifest, importFiles, removeFile, clearFolder, clearAll, getUsage, getTrackUrl };
 })();

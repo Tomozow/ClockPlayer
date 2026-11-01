@@ -421,6 +421,49 @@
     </div>
   </section>
 
+  <!-- OBS Studio Integration (GitHub Pages) -->
+  <section id="obs-pages">
+    <h2>GitHub Pages 版を OBS で使う</h2>
+    <p>
+      ダウンロードせずに、公開ページ（<code>https://tomozow.github.io/ClockPlayer/</code>）をそのまま OBS で使えます。
+      設定パネルは OBS の「カスタムブラウザドック」に、プレイヤーはブラウザソースに読み込みます。両者は同じページの保存領域を共有するため、ドックで取り込んだ曲と設定がブラウザソースにそのまま反映されます。
+    </p>
+    <div class="steps">
+      <div class="step-card">
+        <div class="step-number">01</div>
+        <div>
+          <div class="step-title">ドックの追加</div>
+          <div class="step-desc">
+            OBS のメニュー <strong>「ドック」→「カスタムブラウザドック」</strong> で、URL に <code>https://tomozow.github.io/ClockPlayer/index.html</code> を指定します。
+          </div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-number">02</div>
+        <div>
+          <div class="step-title">ブラウザソースの追加</div>
+          <div class="step-desc">
+            ブラウザソースを追加し、「ローカルファイル」のチェックは外したまま、URL に <code>https://tomozow.github.io/ClockPlayer/obs.html</code> を指定します。サイズと「OBSで音声を制御する」はローカル版と同じです。
+          </div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-number">03</div>
+        <div>
+          <div class="step-title">曲の取り込み</div>
+          <div class="step-desc">
+            ドックの歯車から設定パネルを開き、時間帯を選んで <strong>「曲を追加」</strong> または <strong>「フォルダから追加」</strong> で曲を取り込みます。曲はブラウザの保存領域にコピーされ、OBS を再起動しても残ります。
+            再生はブラウザソース側で行われ、ドックの再生ボタンや曲送りはブラウザソースを操作します。
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="alert alert-info">
+      <h3>保存領域の容量</h3>
+      <p>取り込んだ曲は曲の容量分だけディスクを使います。リスト右の「✕」で1曲ずつ、「bgmA を空にする」でフォルダごと、「すべて削除」でまとめて削除できます。使用量はリストの左下に表示されます。</p>
+    </div>
+  </section>
+
   <!-- Notes -->
   <section id="notes">
     <h2>注意事項</h2>

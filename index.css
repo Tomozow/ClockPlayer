@@ -1118,3 +1118,91 @@ body.minimal-mode .config-container {
 }
 
 
+
+/* --- Browser Library (GitHub Pages / OBS ドック用) --- */
+.library-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.library-actions .action-btn {
+  flex: 1;
+  height: 36px;
+  padding: 0 8px;
+  font-size: 0.85rem;
+}
+#library-progress {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+#library-progress:empty {
+  display: none;
+}
+.library-files {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 4px;
+  max-height: 150px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+.library-files:empty {
+  display: none;
+}
+.library-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.library-file:last-child {
+  border-bottom: none;
+}
+.library-file span {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.library-delete {
+  background: transparent;
+  border: none;
+  color: #ff6b6b;
+  cursor: pointer;
+  font-weight: bold;
+  padding: 2px 6px;
+}
+.library-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+#library-usage {
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+}
+.library-link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.library-link:hover {
+  color: #ff6b6b;
+}
+.library-link:disabled {
+  opacity: 0.4;
+  cursor: default;
+  text-decoration: none;
+}

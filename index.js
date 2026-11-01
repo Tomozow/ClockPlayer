@@ -1846,6 +1846,11 @@ function updateFolderConnectionUI(scanDisk = false) {
 
   connSection.style.display = 'block';
 
+  if (useBrowserLibrary) {
+    renderLibraryList();
+    return;
+  }
+
   const dis = document.getElementById('conn-state-disconnected');
   const conn = document.getElementById('conn-state-connected');
   const folderNameSpan = document.getElementById('connected-folder-name');
@@ -2530,14 +2535,282 @@ function finishProgressModal() {
 }
 
 
-// --- Dock ⇄ Browser Source Sync (作業中: 方式確定までの仮実装。現状は同期なしで従来どおり動く) ---
+// --- Dock ⇄ Browser Source Sync ---
+// OBS のカスタムブラウザドック（index.html）とブラウザソース（obs.html）は同じオリジンなら
+// BroadcastChannel と localStorage を共有する。音は再生役の obs.html が鳴らし、ドックは操作と設定を担う。
+const SYNC_CHANNEL_NAME = 'clockplayer-sync';
+const REMOTE_TIMEOUT_MS = 3000;
 let syncChannel = null;
 let remoteState = null;
-function isRemoteActive() { return false; }
-function sendRemoteCommand() {}
-function broadcastPlayerState() {}
-function initSync() {}
+let remoteSeenAt = 0;
+let lastStateBroadcastAt = 0;
+
+function isRemoteActive() {
+  return !isPlayerRole && Date.now() - remoteSeenAt < REMOTE_TIMEOUT_MS;
+}
+
+function sendRemoteCommand(action, value) {
+  if (syncChannel) syncChannel.postMessage({ type: 'command', action, value });
+}
+
+function broadcastPlayerState() {
+  if (!isPlayerRole || !syncChannel) return;
+  lastStateBroadcastAt = Date.now();
+  const file = currentPlaylist[currentTrackIndex] || null;
+  syncChannel.postMessage({
+    type: 'state',
+    file: file && !audio.src ? null : file,
+    currentTime: audio.currentTime || 0,
+    duration: audio.duration || 0,
+    playing: !audio.paused
+  });
+}
+
+function handleRemoteCommand(msg) {
+  if (msg.action === 'toggle') {
+    btnPlay.click();
+  } else if (msg.action === 'next') {
+    btnNext.click();
+  } else if (msg.action === 'prev') {
+    btnPrev.click();
+  } else if (msg.action === 'seek') {
+    if (audio.duration) audio.currentTime = msg.value * audio.duration;
+  } else if (msg.action === 'play-path') {
+    const idx = currentPlaylist.findIndex(f => f.path === msg.value);
+    if (idx !== -1) {
+      currentTrackIndex = idx;
+      playNextTrack(true);
+    }
+  }
+  broadcastPlayerState();
+}
+
+function renderRemoteState(state) {
+  const wasRemote = isRemoteActive();
+  remoteSeenAt = Date.now();
+
+  // 再生役が見つかったら、こちらの音は止めて二重再生を防ぐ
+  if (!wasRemote && !audio.paused) {
+    audio.pause();
+    audio.removeAttribute('src');
+  }
+
+  const prevPath = remoteState && remoteState.file ? remoteState.file.path : null;
+  const nextPath = state.file ? state.file.path : null;
+  if (state.file && nextPath !== prevPath) {
+    updateTrackTitleDisplay(state.file);
+  }
+  remoteState = state;
+
+  setPlayingUI(state.playing);
+  if (state.duration) {
+    if (progressFill) progressFill.style.width = `${(state.currentTime / state.duration) * 100}%`;
+    if (timeCurrent) timeCurrent.textContent = formatAudioTime(state.currentTime);
+    if (timeTotal) timeTotal.textContent = formatAudioTime(state.duration);
+  }
+}
+
+// 他の画面で保存された設定を取り込む（ブラウザライブラリ利用時のみ。ローカル版は config.js が正）
+function applyExternalConfig() {
+  const prevSeg = segments[activeSegmentIndex];
+  const prevFolder = prevSeg ? prevSeg.folderPath : null;
+  const prevShuffle = isShuffle;
+
+  loadConfig();
+
+  if (!audio.paused && !fadeIntervalId) {
+    audio.volume = isMuted ? 0 : globalVolume;
+  }
+  if (volumeSlider) volumeSlider.value = globalVolume;
+  if (btnShuffle) btnShuffle.classList.toggle('active-toggle', isShuffle);
+  if (timelineBar) {
+    selectedSegmentIndex = Math.min(selectedSegmentIndex, segments.length - 1);
+    selectSegment(selectedSegmentIndex);
+  }
+
+  const currentMin = getCurrentTimeInMinutes();
+  const newIndex = segments.findIndex(s => currentMin >= s.start && currentMin < s.end);
+  const newSeg = segments[newIndex];
+  if (!newSeg || newIndex !== activeSegmentIndex || newSeg.folderPath !== prevFolder) {
+    activeSegmentIndex = -2; // 強制的に切替処理を走らせる
+    updateActiveTimeZone(false);
+  } else {
+    updateThemeClass(activeSegmentIndex);
+    if (activePeriodName) {
+      activePeriodName.textContent = `${newSeg.name} (${formatTime(newSeg.start)} - ${formatTime(newSeg.end)})`;
+    }
+    if (isShuffle !== prevShuffle && newSeg.files.length > 0) {
+      const playingPath = audio.src ? (currentPlaylist[currentTrackIndex] || {}).path : null;
+      buildPlaylistForSegment(newSeg);
+      const idx = currentPlaylist.findIndex(f => f.path === playingPath);
+      if (idx !== -1) currentTrackIndex = idx;
+    }
+  }
+}
+
+// ライブラリの曲が増減したときの反映
+async function applyLibraryUpdate() {
+  await loadBgmManifest();
+  for (const s of segments) loadFilesForSegment(s);
+  const selectedSeg = segments[selectedSegmentIndex];
+  if (selectedSeg && folderStatusText) updateFolderStatus(selectedSeg);
+  if (!isPlayerRole) renderLibraryList();
+
+  const activeSeg = segments[activeSegmentIndex];
+  if (!activeSeg || isRemoteActive()) return;
+  const playingPath = audio.src ? (currentPlaylist[currentTrackIndex] || {}).path : null;
+  const stillExists = playingPath && activeSeg.files.some(f => f.path === playingPath);
+  if (!stillExists) {
+    // 再生中の曲が消えた・曲が無かった時間帯に曲が入った場合は選び直す
+    const shouldPlay = isPlayerRole || !!playingPath;
+    activeSegmentIndex = -2;
+    updateActiveTimeZone(shouldPlay);
+  }
+}
+
+function initSync() {
+  if (typeof BroadcastChannel !== 'function') return;
+  syncChannel = new BroadcastChannel(SYNC_CHANNEL_NAME);
+
+  syncChannel.addEventListener('message', (e) => {
+    const msg = e.data || {};
+    if (msg.type === 'hello' && isPlayerRole) {
+      broadcastPlayerState();
+    } else if (msg.type === 'state' && !isPlayerRole) {
+      renderRemoteState(msg);
+    } else if (msg.type === 'command' && isPlayerRole) {
+      handleRemoteCommand(msg);
+    } else if (msg.type === 'library-updated') {
+      applyLibraryUpdate();
+    }
+  });
+
+  if (isPlayerRole) {
+    ['play', 'pause', 'loadedmetadata'].forEach(ev => audio.addEventListener(ev, broadcastPlayerState));
+    audio.addEventListener('timeupdate', () => {
+      if (Date.now() - lastStateBroadcastAt >= 1000) broadcastPlayerState();
+    });
+    // 曲が無いときもドックに存在を知らせる
+    setInterval(() => {
+      if (Date.now() - lastStateBroadcastAt >= 1000) broadcastPlayerState();
+    }, 1000);
+    broadcastPlayerState();
+  } else {
+    syncChannel.postMessage({ type: 'hello' });
+  }
+
+  if (useBrowserLibrary) {
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'bgm_clock_config') applyExternalConfig();
+    });
+  }
+}
+
+function notifyLibraryUpdated() {
+  if (syncChannel) syncChannel.postMessage({ type: 'library-updated' });
+  applyLibraryUpdate();
+}
+
+// --- Browser Library UI (index.html の設定パネル) ---
+function formatBytes(bytes) {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${Math.round(bytes / 1024)} KB`;
+}
+
+async function refreshLibraryUsage() {
+  const usageEl = document.getElementById('library-usage');
+  if (usageEl) usageEl.textContent = formatBytes(await ClockLibrary.getUsage());
+}
+
+function renderLibraryList() {
+  const listEl = document.getElementById('library-files-list');
+  const activeSeg = segments[selectedSegmentIndex];
+  if (!listEl || !activeSeg) return;
+
+  listEl.innerHTML = '';
+  const files = bgmManifest[activeSeg.folderPath] || [];
+  files.forEach(file => {
+    const li = document.createElement('li');
+    li.className = 'library-file';
+    const name = document.createElement('span');
+    name.textContent = file.name;
+    const del = document.createElement('button');
+    del.className = 'library-delete';
+    del.textContent = '✕';
+    del.title = '削除';
+    del.addEventListener('click', async () => {
+      await ClockLibrary.removeFile(activeSeg.folderPath, file.name);
+      notifyLibraryUpdated();
+    });
+    li.appendChild(name);
+    li.appendChild(del);
+    listEl.appendChild(li);
+  });
+
+  const clearFolderBtn = document.getElementById('btn-library-clear-folder');
+  if (clearFolderBtn) {
+    clearFolderBtn.textContent = `${activeSeg.folderPath} を空にする`;
+    clearFolderBtn.disabled = files.length === 0;
+  }
+  refreshLibraryUsage();
+}
+
+async function importToLibrary(fileList) {
+  const activeSeg = segments[selectedSegmentIndex];
+  if (!activeSeg || !activeSeg.folderPath || !fileList || fileList.length === 0) return;
+  const progressEl = document.getElementById('library-progress');
+  try {
+    await ClockLibrary.importFiles(activeSeg.folderPath, fileList, extractAudioMetadata, (done, total) => {
+      if (progressEl) progressEl.textContent = `${done} / ${total}`;
+    });
+  } catch (err) {
+    console.error('Library import failed:', err);
+    alert('曲の取り込みに失敗しました: ' + err.message);
+  }
+  if (progressEl) progressEl.textContent = '';
+  notifyLibraryUpdated();
+}
+
 function initBrowserLibraryUI() {
-  const connSection = document.getElementById('folder-connection-section');
-  if (connSection) connSection.style.display = 'none';
+  const faccess = document.getElementById('faccess-supported-container');
+  const unsupported = document.getElementById('faccess-unsupported-msg');
+  const library = document.getElementById('library-container');
+  if (faccess) faccess.style.display = 'none';
+  if (unsupported) unsupported.style.display = 'none';
+  if (library) library.style.display = 'block';
+
+  const filesInput = document.getElementById('library-files-input');
+  const dirInput = document.getElementById('library-dir-input');
+  [filesInput, dirInput].forEach(input => {
+    if (!input) return;
+    input.addEventListener('change', async () => {
+      await importToLibrary(input.files);
+      input.value = '';
+    });
+  });
+  const btnAddFiles = document.getElementById('btn-library-add-files');
+  if (btnAddFiles) btnAddFiles.addEventListener('click', () => filesInput.click());
+  const btnAddDir = document.getElementById('btn-library-add-dir');
+  if (btnAddDir) btnAddDir.addEventListener('click', () => dirInput.click());
+
+  const clearFolderBtn = document.getElementById('btn-library-clear-folder');
+  if (clearFolderBtn) {
+    clearFolderBtn.addEventListener('click', async () => {
+      const activeSeg = segments[selectedSegmentIndex];
+      if (!activeSeg || !confirm(`${activeSeg.folderPath} の曲をすべて削除しますか？`)) return;
+      await ClockLibrary.clearFolder(activeSeg.folderPath);
+      notifyLibraryUpdated();
+    });
+  }
+  const clearAllBtn = document.getElementById('btn-library-clear-all');
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', async () => {
+      if (!confirm('取り込んだ曲をすべて削除しますか？')) return;
+      await ClockLibrary.clearAll();
+      notifyLibraryUpdated();
+    });
+  }
+
+  renderLibraryList();
 }
