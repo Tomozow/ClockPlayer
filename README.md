@@ -20,11 +20,17 @@
 
 ![設定パネル](docs/settings.png)
 
+## ダウンロード
+
+1. [最新の Release](https://github.com/Tomozow/ClockPlayer/releases/latest) を開き、「Assets」にある `ClockPlayer-v<版>.zip` をダウンロードします（「Source code」は開発用です）
+2. ZIP を右クリックして「すべて展開」を選びます。`ClockPlayer` フォルダができるので、好きな場所に置きます
+3. 新しい版に入れ替えるときは、古いフォルダの `bgm` と `data` を新しいフォルダにコピーすると、曲と設定を引き継げます
+
 ## 使い方（ローカル版）
 
 ダウンロードして使う版です。曲と設定はダウンロードしたフォルダの中に保存されるので、ブラウザのキャッシュが消えても失われません。Windows の PowerShell で小さなサーバーを動かすため、追加のインストールは要りません。
 
-1. [Releases](https://github.com/Tomozow/ClockPlayer/releases/latest) から `ClockPlayer-v<版>.zip` をダウンロードして展開し、`start.bat` を実行します
+1. 展開した `ClockPlayer` フォルダの `start.bat` を実行します
    - ウィンドウにポート番号と、OBS に登録する場所が表示されます。ウィンドウを閉じると停止します
    - ウィンドウを出さずに動かす場合は `start_background.bat`、止めるときは `stop_background.bat` を実行します
 2. OBS に登録します

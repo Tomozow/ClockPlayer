@@ -189,6 +189,30 @@
       color: var(--text-muted);
     }
 
+    a {
+      color: var(--accent-color);
+    }
+
+    /* Screenshots */
+    .shot {
+      margin: 14px 0 0;
+    }
+
+    .shot img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid var(--border-color);
+    }
+
+    .shot-narrow img {
+      max-width: 320px;
+    }
+
+    section > .shot {
+      margin-bottom: 20px;
+    }
+
     /* Alerts (Minimalist Blocks) */
     .alert {
       padding: 20px;
@@ -307,6 +331,31 @@
     </div>
   </section>
 
+  <!-- Download -->
+  <section id="download">
+    <h2>入手する</h2>
+    <div class="steps">
+      <div class="step-card">
+        <div class="step-number">01</div>
+        <div>
+          <div class="step-title">Releases から ZIP をダウンロードする</div>
+          <div class="step-desc">
+            <a href="https://github.com/Tomozow/ClockPlayer/releases/latest">https://github.com/Tomozow/ClockPlayer/releases/latest</a> を開き、「Assets」にある <strong><code>ClockPlayer-v&lt;版&gt;.zip</code></strong> をダウンロードします。「Source code」は開発用なので選ばないでください。
+          </div>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-number">02</div>
+        <div>
+          <div class="step-title">展開する</div>
+          <div class="step-desc">
+            ZIP を右クリックして「すべて展開」を選びます。<code>ClockPlayer</code> フォルダができるので、好きな場所に置いてください。新しい版に入れ替えるときは、古いフォルダの <code>bgm</code> と <code>data</code> を新しいフォルダにコピーすると、曲と設定を引き継げます。
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Start Server -->
   <section id="start">
     <h2>起動と停止</h2>
@@ -339,6 +388,8 @@
           <div class="step-desc">
             OBS を使わない場合は、ウィンドウに表示された <code>http://127.0.0.1:ポート/</code> をブラウザで開きます。<code>index.html</code> を直接開くと、この手順の案内が表示されます。
           </div>
+          <figure class="shot"><img src="docs/manual/guide.png" alt="index.html を直接開いたときの案内" loading="lazy"></figure>
+
         </div>
       </div>
     </div>
@@ -357,8 +408,10 @@
         <div>
           <div class="step-title">設定パネルから取り込む</div>
           <div class="step-desc">
-            設定パネル（OBS のドックでは常に表示）で時間帯を選び、<strong>「曲を追加」</strong> または <strong>「フォルダから追加」</strong> で音楽ファイル（<code>.mp3</code>, <code>.wav</code>, <code>.m4a</code>, <code>.flac</code> など）を選びます。曲は <code>bgm</code> フォルダの、その時間帯に割り当てたフォルダへコピーされます。
+            設定パネル（OBS のドックでは常に表示）で時間帯を選び、<strong>「曲を追加」</strong> または <strong>「フォルダから追加」</strong> で音楽ファイル（<code>.mp3</code>, <code>.wav</code>, <code>.m4a</code>, <code>.flac</code> など）を選びます。曲は <code>bgm</code> フォルダの、その時間帯に割り当てたフォルダへコピーされます。曲名の横の ✕ で1曲ずつ、下の欄からフォルダごと・すべてを削除できます。
           </div>
+          <figure class="shot"><img src="docs/manual/add-music.png" alt="時間帯の設定と曲の登録欄" loading="lazy"></figure>
+
         </div>
       </div>
       <div class="step-card">
@@ -378,8 +431,9 @@
     <h2>スケジュールとプリセットの設定</h2>
     <p style="margin-bottom: 15px;">
       <strong>■ スケジュールの変更:</strong><br>
-      設定パネル内の「24時間スライダー」の境界をドラッグして、時間帯の切り替え時間を調整できます。各時間帯に割り当てるフォルダも変更可能です。
+      設定パネル内の「24時間スライダー」の境界をドラッグして、時間帯の切り替え時間を調整できます。時間帯をクリックすると、名前・時間・色・割り当てるフォルダを下の欄で変更できます。
     </p>
+    <figure class="shot"><img src="docs/manual/schedule.png" alt="24時間スライダーとプリセット" loading="lazy"></figure>
     <p>
       <strong>■ プリセット:</strong><br>
       用意されたプリセットを切り替えるか、<code>sample_preset.json</code> を設定パネルの「ファイルを取り込む」からインポートして適用します。
@@ -392,6 +446,7 @@
     <p>
       設定パネルを OBS の「カスタムブラウザドック」に、プレイヤーをブラウザソースに読み込みます。音はブラウザソースで鳴り、ドックの再生ボタンや曲送り、設定の変更はブラウザソースにすぐ反映されます。先に start.bat でサーバーを起動しておいてください（OBS を先に開いた場合も、サーバーが起動すると自動でつながります）。
     </p>
+    <figure class="shot"><img src="docs/manual/player.png" alt="ブラウザソースの表示（ミニマル表示）" loading="lazy"></figure>
     <div class="steps">
       <div class="step-card">
         <div class="step-number">01</div>
@@ -407,8 +462,11 @@
         <div>
           <div class="step-title">ドックの追加</div>
           <div class="step-desc">
-            メニューの <strong>「ドック」→「カスタムブラウザドック」</strong> で、URL に start.bat のウィンドウに表示された <code>file:///…/local_dock.html</code> を入れます。
+            メニューの <strong>「ドック」→「カスタムブラウザドック」</strong> で、URL に start.bat のウィンドウに表示された <code>file:///…/local_dock.html</code> を入れます。この2つの場所は、設定パネルの下の欄からもコピーできます。
           </div>
+          <figure class="shot"><img src="docs/manual/obs-urls.png" alt="ブラウザソースとドックに登録する場所" loading="lazy"></figure>
+          <figure class="shot shot-narrow"><img src="docs/manual/dock.png" alt="OBS のドックの表示" loading="lazy"></figure>
+
         </div>
       </div>
       <div class="step-card">
