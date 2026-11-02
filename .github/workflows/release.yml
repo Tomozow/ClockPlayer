@@ -46,6 +46,9 @@ jobs:
           rm -rf dist
           mkdir -p "$DIST"
           cp "${FILES[@]}" "$DIST/"
+          # README.html のスクリーンショット
+          mkdir -p "$DIST/docs"
+          cp -r docs/manual "$DIST/docs/"
           # 初回起動の前に曲を入れられるよう、空の bgm フォルダも入れる
           for f in bgmA bgmB bgmC bgmD bgmE bgmF; do mkdir -p "$DIST/bgm/$f"; done
           (cd dist && zip -r -X "ClockPlayer-${TAG}.zip" ClockPlayer)
