@@ -2,7 +2,7 @@
 
 このプロジェクトの変更点を記録します。版の付け方は [Semantic Versioning](https://semver.org/lang/ja/) に従い、1.0 までは互換性のない変更で 2 桁目を上げます。
 
-## [Unreleased]
+## [0.2.2] - 2026-11-02
 
 ### Fixed
 
