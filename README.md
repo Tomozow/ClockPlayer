@@ -66,6 +66,6 @@ OBS を使わない場合は、ウィンドウに表示された `http://127.0.0
 | `config.js` | 既定のスケジュール |
 | `start.bat` / `start_background.bat` / `stop_background.bat` | ローカル版のサーバーの起動・停止 |
 | `server.ps1` | ローカル版のサーバー（PowerShell） |
-| `local_obs.html` / `local_dock.html` / `local.js` | ローカル版で OBS に登録する入口。起動中のサーバーのポートを探して移る |
+| `local_obs.html` / `local_dock.html` / `local.js` | ローカル版で OBS に登録するページ。起動中のサーバーのポートを探して移る |
 | `bgm/` | 曲（`bgmA`〜`bgmF`。リポジトリには含みません） |
 | `data/` | ローカル版の設定・プリセット・曲リスト（サーバーが作成。リポジトリには含みません） |
