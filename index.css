@@ -1217,8 +1217,12 @@ body.minimal-mode .config-container {
 }
 .source-url-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
+}
+.source-url-row + .source-url-row {
+  margin-top: 10px;
 }
 .source-url-help {
   margin: 8px 0 0;
@@ -1226,8 +1230,10 @@ body.minimal-mode .config-container {
   color: var(--text-main);
   line-height: 1.5;
 }
+/* ドックの狭い幅でも URL が読めるよう、見出しは入力欄の上に置く */
 .source-url-row .input-label {
-  white-space: nowrap;
+  flex-basis: 100%;
+  margin-bottom: 0;
 }
 .source-url-row .text-input {
   flex: 1;
@@ -1240,6 +1246,34 @@ body.minimal-mode .config-container {
   padding: 0 12px;
   font-size: 0.8rem;
   white-space: nowrap;
+}
+
+/* --- サーバーを通さずに開いたときの案内 --- */
+.local-guide {
+  width: min(640px, calc(100% - 32px));
+  padding: 28px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  color: var(--text-main);
+}
+.local-guide h1 {
+  margin: 0 0 18px;
+  font-size: 1.3rem;
+}
+.local-guide ol {
+  margin: 0;
+  padding-left: 1.4em;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.local-guide-alt {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 /* --- OBS ドック用の簡易表示 ---

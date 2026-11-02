@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clock Player</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      display: flex; align-items: center; justify-content: center;
+      background: #1e1f24; color: #c9cbd3;
+      font-family: 'Segoe UI', 'Yu Gothic UI', 'Meiryo', sans-serif; font-size: 13px;
+    }
+    #waiting { display: none; text-align: center; line-height: 1.8; }
+    #waiting strong { color: #fff; }
+  </style>
+</head>
+<body>
+  <!-- OBS のカスタムブラウザドックに登録する入口。起動中のサーバーのドック表示へ移る -->
+  <p id="waiting"><strong>start.bat</strong> を実行してください</p>
+  <script src="local.js"></script>
+  <script>
+    ClockLocal.connect('index.html?dock', () => {
+      document.getElementById('waiting').style.display = 'block';
+    });
+  </script>
+</body>
+</html>

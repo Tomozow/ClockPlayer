@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Clock Player</title>
+  <style>
+    html, body { margin: 0; background: transparent; }
+  </style>
+</head>
+<body>
+  <!-- OBS のブラウザソースに「ローカルファイル」で登録する入口。起動中のサーバーの obs.html へ移る -->
+  <script src="local.js"></script>
+  <script>ClockLocal.connect('obs.html');</script>
+</body>
+</html>
