@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `start_background.bat` で起動したサーバーが、Windows 11 の既定のターミナル（Windows Terminal）ではタスクバーに最小化されるだけで、ウィンドウが残っていた。ウィンドウを持たないプロセスとして起動し直すようにした。起動したウィンドウは登録する場所を表示して10秒で閉じる
+- 既定のスケジュールの時間帯名「昼 of BGM」を「昼のBGM」に直した
+
 ### Changed
 
 - `requirements_spec.md` を今の構成（PowerShell のローカルサーバー、GitHub Pages 版、OBS 連携、配布）に合わせて書き直した

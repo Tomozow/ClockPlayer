@@ -65,7 +65,7 @@ const DEFAULT_CONFIG = {
   segments: [
     { id: '1', name: '深夜', start: 0, end: 360, color: COLORS[0], folderPath: 'bgmA' },
     { id: '2', name: '朝のBGM', start: 360, end: 720, color: COLORS[1], folderPath: 'bgmB' },
-    { id: '3', name: '昼 of BGM', start: 720, end: 1020, color: COLORS[2], folderPath: 'bgmC' },
+    { id: '3', name: '昼のBGM', start: 720, end: 1020, color: COLORS[2], folderPath: 'bgmC' },
     { id: '4', name: '夕方BGM', start: 1020, end: 1140, color: COLORS[3], folderPath: 'bgmD' },
     { id: '5', name: '夜のBGM', start: 1140, end: 1440, color: COLORS[4], folderPath: 'bgmE' }
   ],

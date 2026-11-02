@@ -92,7 +92,7 @@ OBS に `http://127.0.0.1:<ポート>/…` を直接登録すると、ポート�
 | `local_obs.html` / `local_dock.html` / `local.js` | ローカル版で OBS に登録する入口 |
 | `server.ps1` | ローカルサーバー |
 | `start.bat` | サーバーをウィンドウに表示して起動する。ウィンドウを閉じると停止する |
-| `start_background.bat` | サーバーをウィンドウを出さずに起動する |
+| `start_background.bat` | サーバーをウィンドウを出さずに起動する（`-Background`）。サーバーはウィンドウを持たないプロセス（`CreateNoWindow`）として起動し直し、起動を確かめて登録する場所を表示したら、最初のウィンドウは10秒で閉じる |
 | `stop_background.bat` | 起動中のサーバーを止める |
 | `README.html` | 取扱説明書（`docs/manual/` のスクリーンショットを使う） |
 | `.github/workflows/release.yml` | Release の ZIP を作るワークフロー（6章） |

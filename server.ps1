@@ -2,11 +2,13 @@
 # ダウンロードしたフォルダを http://127.0.0.1:<ポート>/ で配信し、曲（bgm/）と設定（data/）をディスクに保存する。
 # Windows 標準の PowerShell 5.1 で動くように書いている（追加のインストールは不要）。
 #   start.bat            : このウィンドウで起動し、閉じると停止する
-#   start_background.bat : ウィンドウを出さずに起動する
+#   start_background.bat : ウィンドウを出さずに起動する（-Background）
 #   stop_background.bat  : 起動中のサーバーを止める（-Stop）
 param(
     [switch]$Background,
-    [switch]$Stop
+    [switch]$Stop,
+    # -Background が内部で使う。ウィンドウを持たないプロセスとして起動し直したことを表す
+    [switch]$Detached
 )
 
 $ErrorActionPreference = 'Stop'
@@ -619,6 +621,31 @@ if ($running) {
     exit 0
 }
 
+# バックグラウンド起動: ウィンドウを持たないプロセス（CreateNoWindow）として自分を起動し直し、
+# 起動を確かめて場所を表示したらこのプロセスは終わる。
+# powershell -WindowStyle Hidden は、Windows 11 の既定のターミナル（Windows Terminal）では最小化になるだけなので使わない
+if ($Background -and -not $Detached) {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = (Get-Process -Id $PID).Path
+    $psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Background -Detached"
+    $psi.WorkingDirectory = $Root
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    [void][System.Diagnostics.Process]::Start($psi)
+    for ($i = 0; $i -lt 60; $i++) {
+        Start-Sleep -Milliseconds 250
+        $started = Get-RunningPort
+        if ($started) {
+            Show-Urls $started "Clock Player をバックグラウンドで起動しました（ポート $started）"
+            Write-Host '  止めるときは stop_background.bat を実行してください。' -ForegroundColor Yellow
+            Write-Host ''
+            exit 0
+        }
+    }
+    Write-Host 'サーバーを起動できませんでした。data/server.log を確認してください。' -ForegroundColor Red
+    exit 1
+}
+
 # 初期設定のポートは data/server.json で変えられる。使用中なら続きの番号を順に試す
 $basePort = $DefaultPort
 if (Test-Path -LiteralPath $SettingsFile) {
@@ -647,6 +674,7 @@ for ($p = $basePort; $p -lt $basePort + $PortAttempts; $p++) {
     }
 }
 if (-not $listener) {
+    Write-Log "no free port in $basePort-$($basePort + $PortAttempts - 1)"
     Write-Host "ポート $basePort から $($basePort + $PortAttempts - 1) がすべて使用中のため、起動できませんでした。" -ForegroundColor Red
     Write-Host 'data/server.json の port を別の番号に変えてください。'
     exit 1
