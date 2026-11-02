@@ -6,7 +6,7 @@
 
 ### Changed
 
-- README.md と README.html に、Releases からのダウンロード方法を追記した
+- README.md に、Releases からのダウンロード方法を追記した
 - README.html に、各操作の画面のスクリーンショットを追加した。Releases の ZIP にも同梱する（`docs/manual/`）
 - README.md の設定パネルのスクリーンショットを、今の画面に差し替えた
 
