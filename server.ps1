@@ -622,7 +622,7 @@ if ($running) {
 }
 
 # バックグラウンド起動: ウィンドウを持たないプロセス（CreateNoWindow）として自分を起動し直し、
-# 起動を確かめて場所を表示したらこのプロセスは終わる。
+# 起動を確かめたら何も表示せずにこのプロセスは終わる（失敗したときだけ理由を表示する）。
 # powershell -WindowStyle Hidden は、Windows 11 の既定のターミナル（Windows Terminal）では最小化になるだけなので使わない
 if ($Background -and -not $Detached) {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
@@ -634,13 +634,7 @@ if ($Background -and -not $Detached) {
     [void][System.Diagnostics.Process]::Start($psi)
     for ($i = 0; $i -lt 60; $i++) {
         Start-Sleep -Milliseconds 250
-        $started = Get-RunningPort
-        if ($started) {
-            Show-Urls $started "Clock Player をバックグラウンドで起動しました（ポート $started）"
-            Write-Host '  止めるときは stop_background.bat を実行してください。' -ForegroundColor Yellow
-            Write-Host ''
-            exit 0
-        }
+        if (Get-RunningPort) { exit 0 }
     }
     Write-Host 'サーバーを起動できませんでした。data/server.log を確認してください。' -ForegroundColor Red
     exit 1
