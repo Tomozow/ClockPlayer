@@ -2,6 +2,17 @@
 
 このプロジェクトの変更点を記録します。版の付け方は [Semantic Versioning](https://semver.org/lang/ja/) に従い、1.0 までは互換性のない変更で 2 桁目を上げます。
 
+## [0.2.3] - 2026-11-02
+
+### Changed
+
+- README.md と README.html を推敲した（「版」を「バージョン」に、OBS に登録する「入口」を「ページ」にするなど）
+
+### Fixed
+
+- README.html で、ドックには音量の操作があるのに「時計や音量を省き」と書いていた
+- README.html のプリセットの説明から、存在しない `sample_preset.json` を取り込む一文を外した
+
 ## [0.2.2] - 2026-11-02
 
 ### Fixed
