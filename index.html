@@ -97,7 +97,7 @@
               <!-- Options dynamically inserted via JS -->
             </div>
           </div>
-          <button id="btn-save-preset" class="action-btn" style="height: 36px; padding: 0 12px; font-size: 0.85rem;" title="現在のスケジュールをブラウザに保存">
+          <button id="btn-save-preset" class="action-btn" style="height: 36px; padding: 0 12px; font-size: 0.85rem;" title="現在のスケジュールを保存">
             保存
           </button>
           <button id="btn-delete-preset" class="action-btn btn-danger" style="height: 36px; padding: 0 12px; font-size: 0.85rem; display: none;" title="選択中のプリセットを削除">
@@ -184,9 +184,9 @@
 
         <!-- Connection and Copy BGM Section -->
         <div id="folder-connection-section" class="input-group" style="margin-top: 15px; border-top: 1px dashed var(--glass-border); padding-top: 15px; display: none;">
-          <span class="input-label">フォルダー同期・音楽ファイルの追加</span>
-          <div id="faccess-unsupported-msg" style="display: none; color: #ff8888; font-size: 0.85rem; line-height: 1.4;">
-            ⚠️ お使いのブラウザはローカルフォルダへの書き込みに対応していません。ファイルの追加コピー機能は Chrome または Edge でご利用ください。
+          <span class="input-label">曲</span>
+          <div id="library-unsupported-msg" style="display: none; color: #ff8888; font-size: 0.85rem; line-height: 1.4;">
+            ⚠️ このブラウザでは曲を保存できません。Chrome または Edge でご利用ください。
           </div>
           <div id="library-container" style="display: none;">
             <div class="library-actions">
@@ -199,58 +199,9 @@
             <ul id="library-files-list" class="library-files"></ul>
             <div class="library-footer">
               <span id="library-usage"></span>
+              <button id="btn-library-rescan" class="library-link" style="display: none;">再読み込み</button>
               <button id="btn-library-clear-folder" class="library-link"></button>
               <button id="btn-library-clear-all" class="library-link">すべて削除</button>
-            </div>
-          </div>
-          <div id="faccess-supported-container">
-            <!-- State 1: Disconnected -->
-            <div id="conn-state-disconnected" style="display: block;">
-              <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
-                ブラウザからローカルフォルダへの書き込みを許可するため、アプリのルートフォルダを選択してください。
-              </p>
-              <button id="btn-connect-folder" class="action-btn btn-primary" style="width: 100%; height: 36px; font-size: 0.85rem;">
-                📂 アプリのルートフォルダを接続
-              </button>
-            </div>
-            
-            <!-- State 2: Connected -->
-            <div id="conn-state-connected" style="display: none;">
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                <span id="connected-folder-name" style="font-size: 0.8rem; color: var(--primary-color); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%;">
-                  ✅ 接続中
-                </span>
-                <button id="btn-disconnect-folder" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.75rem; cursor: pointer; text-decoration: underline; padding: 0;">
-                  解除
-                </button>
-              </div>
-              <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                <button id="btn-copy-files" class="action-btn" style="flex: 1; height: 36px; font-size: 0.85rem; padding: 0 8px;">
-                  <svg class="icon-svg" viewBox="0 0 24 24" style="width:14px; height:14px;"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
-                  音楽ファイルの追加・コピー
-                </button>
-              </div>
-              <!-- Loaded files list container -->
-              <div id="connected-folder-files" style="margin-top: 10px; max-height: 150px; overflow-y: auto; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--glass-border); border-radius: 6px; padding: 4px; display: none;">
-                <ul id="connected-files-list" style="list-style: none; margin: 0; padding: 0; font-size: 0.8rem; line-height: 1.4;">
-                  <!-- Dynamic file list items -->
-                </ul>
-              </div>
-
-              <!-- Inline Copy Progress & Log Area -->
-              <div id="copy-progress-inline-section" style="margin-top: 10px; display: none; background: rgba(0, 0, 0, 0.15); border: 1px solid var(--glass-border); border-radius: 6px; padding: 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <span style="font-size: 0.75rem; font-weight: 600; color: var(--primary-color);">📂 コピー処理中...</span>
-                  <button id="btn-close-copy-progress" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.75rem; cursor: pointer; text-decoration: underline; padding: 0; display: none;">
-                    閉じる
-                  </button>
-                </div>
-                <!-- Progress Bar -->
-                <div id="copy-progress-bar-container" style="width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; margin-bottom: 8px; display: none;">
-                  <div id="copy-progress-bar-fill" style="height: 100%; width: 0%; background: var(--primary-color); transition: width 0.2s;"></div>
-                </div>
-                <div id="copy-progress-log" style="max-height: 80px; background: rgba(0, 0, 0, 0.15); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; padding: 6px; font-family: monospace; font-size: 0.75rem; overflow-y: auto; white-space: pre-wrap;">コピー準備中...</div>
-              </div>
             </div>
           </div>
         </div>
@@ -260,9 +211,14 @@
       <!-- Browser Source URL -->
       <div class="source-url">
         <div class="source-url-row">
-          <span class="input-label">ブラウザソース</span>
+          <span id="source-url-label" class="input-label">ブラウザソース</span>
           <input type="text" id="source-url" class="text-input" readonly>
           <button id="btn-copy-source-url" class="action-btn">コピー</button>
+        </div>
+        <div id="dock-url-row" class="source-url-row" style="display: none;">
+          <span class="input-label">カスタムブラウザドック</span>
+          <input type="text" id="dock-url" class="text-input" readonly>
+          <button id="btn-copy-dock-url" class="action-btn">コピー</button>
         </div>
         <p class="source-url-help">追加したソースのプロパティで<strong>「OBSで音声を制御する」</strong>にチェックを入れてください。</p>
       </div>
@@ -346,7 +302,6 @@
 
 
 
-  <script src="bgm_manifest.js"></script>
   <script src="config.js"></script>
   <script src="library.js"></script>
   <script src="index.js"></script>

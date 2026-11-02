@@ -1,6 +1,8 @@
 // --- Load OBS modes immediately to prevent flashing ---
-// 保存済みの設定を返す。ブラウザライブラリ利用時（GitHub Pages など）は config.js が書き換えられないため localStorage を優先する
+// 保存済みの設定を返す。ローカル版はサーバーが data フォルダから配る config.js が正本。
+// GitHub Pages 版は config.js が書き換えられないため localStorage を優先する
 function readSavedConfig() {
+  if (window.clockServer) return window.bgmClockConfig || null;
   let stored = null;
   try {
     const rawData = localStorage.getItem('bgm_clock_config');
@@ -8,10 +10,12 @@ function readSavedConfig() {
   } catch (e) {
     console.error('Failed to read config from localStorage:', e);
   }
-  if (window.ClockLibrary && window.ClockLibrary.isActive) {
-    return stored || window.bgmClockConfig || null;
-  }
-  return window.bgmClockConfig || stored;
+  return stored || window.bgmClockConfig || null;
+}
+
+// index.html や obs.html をダウンロードしたフォルダから直接開いたとき（サーバーを通していない）
+function isOpenedAsLocalFile() {
+  return location.protocol === 'file:' || location.hostname === 'absolute';
 }
 
 // ドックでは OBS 向けの表示設定（透過・ミニマルなど）を自分には適用しない
@@ -85,11 +89,9 @@ let bgmManifest = {
   bgmA: [], bgmB: [], bgmC: [], bgmD: [], bgmE: [], bgmF: []
 };
 
-let appFolderHandle = null;
 const useBrowserLibrary = !!(window.ClockLibrary && window.ClockLibrary.isActive);
 // obs.html（ブラウザソース）は再生役、index.html（ドック）は操作役
 const isPlayerRole = document.body.dataset.role === 'player';
-const isFileSystemAccessSupported = typeof window.showDirectoryPicker === 'function';
 
 let cfgObsTransparent = false;
 let cfgObsHideControls = false;
@@ -230,18 +232,38 @@ function getFolderDisplayName(key) {
   return mapping[key] || 'フォルダ未設定';
 }
 
-// --- Preset Management (localStorage) ---
+// --- Preset Management ---
+// ローカル版はサーバーが data フォルダに保存し、GitHub Pages 版は localStorage に保存する
+function readPresets() {
+  if (window.clockServer) return window.bgmClockPresets || null;
+  try {
+    const raw = localStorage.getItem('bgm_clock_presets');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    console.error('Failed to parse presets:', e);
+    return null;
+  }
+}
+
+function writePresets(presets) {
+  if (window.clockServer) {
+    window.bgmClockPresets = presets;
+    ClockLibrary.savePresets(presets).catch(err => {
+      console.error('Failed to save presets:', err);
+      alert('プリセットを保存できませんでした: ' + err.message);
+    });
+    return;
+  }
+  localStorage.setItem('bgm_clock_presets', JSON.stringify(presets));
+}
+
 function loadPresetsList() {
   if (!presetSelect) return;
   
   const options = [{ value: '', text: '-- プリセット選択 --' }];
   
-  let presets = {};
-  try {
-    const rawPresets = localStorage.getItem('bgm_clock_presets');
-    if (rawPresets) {
-      presets = JSON.parse(rawPresets);
-    } else {
+  let presets = readPresets();
+  if (!presets) {
       // Default sample presets
       presets = {
         "1. 標準スケジュール (5区分)": [
@@ -266,10 +288,7 @@ function loadPresetsList() {
           { "name": "イブニングダウン", "start": 1080, "end": 1440, "color": "hsl(230, 45%, 35%)", "folderPath": "bgmE" }
         ]
       };
-      localStorage.setItem('bgm_clock_presets', JSON.stringify(presets));
-    }
-  } catch (e) {
-    console.error('Failed to parse presets:', e);
+      writePresets(presets);
   }
   
   Object.keys(presets).sort().forEach(name => {
@@ -285,6 +304,12 @@ function loadPresetsList() {
 
 // --- Init & Load ---
 window.addEventListener('DOMContentLoaded', async () => {
+  // サーバーを通さずに開いたときは、使い方の案内だけを出す
+  if (isOpenedAsLocalFile()) {
+    showLocalGuide();
+    return;
+  }
+
   // 1. Load BGM playlist manifest
   await loadBgmManifest();
 
@@ -297,12 +322,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     if (btnDeletePreset) btnDeletePreset.style.display = 'inline-block';
     
-    let presets = {};
-    try {
-      const rawPresets = localStorage.getItem('bgm_clock_presets');
-      if (rawPresets) presets = JSON.parse(rawPresets);
-    } catch (e) {}
-    
+    const presets = readPresets() || {};
     const presetData = presets[selected];
     if (presetData && Array.isArray(presetData)) {
       segments = presetData.map((s, idx) => ({
@@ -349,7 +369,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (useBrowserLibrary) {
     initBrowserLibraryUI();
   } else {
-    initFolderConnection();
+    const unsupported = document.getElementById('library-unsupported-msg');
+    if (unsupported) unsupported.style.display = 'block';
   }
 
   // 3. Load presets list
@@ -403,11 +424,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       const trimmed = presetName.trim();
       if (!trimmed) return;
       
-      let presets = {};
-      try {
-        const rawPresets = localStorage.getItem('bgm_clock_presets');
-        if (rawPresets) presets = JSON.parse(rawPresets);
-      } catch (e) {}
+      const presets = readPresets() || {};
       
       presets[trimmed] = segments.map(s => ({
         name: s.name,
@@ -417,11 +434,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         folderPath: s.folderPath || ''
       }));
       
-      localStorage.setItem('bgm_clock_presets', JSON.stringify(presets));
+      writePresets(presets);
       loadPresetsList();
       presetSelect.value = trimmed;
       if (btnDeletePreset) btnDeletePreset.style.display = 'inline-block';
-      alert(`プリセット「${trimmed}」をブラウザに保存しました。`);
+      alert(`プリセット「${trimmed}」を保存しました。`);
     });
   }
 
@@ -432,14 +449,10 @@ window.addEventListener('DOMContentLoaded', async () => {
       
       if (!confirm(`プリセット「${selected}」を削除しますか？`)) return;
       
-      let presets = {};
-      try {
-        const rawPresets = localStorage.getItem('bgm_clock_presets');
-        if (rawPresets) presets = JSON.parse(rawPresets);
-      } catch (e) {}
+      const presets = readPresets() || {};
       
       delete presets[selected];
-      localStorage.setItem('bgm_clock_presets', JSON.stringify(presets));
+      writePresets(presets);
       loadPresetsList();
       
       alert(`プリセット「${selected}」を削除しました。`);
@@ -447,24 +460,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   initSourceUrl();
-
-  // --- Folder Connection & Copy Event Listeners ---
-  const btnConnect = document.getElementById('btn-connect-folder');
-  if (btnConnect) btnConnect.addEventListener('click', connectAppFolder);
-
-  const btnDisconnect = document.getElementById('btn-disconnect-folder');
-  if (btnDisconnect) btnDisconnect.addEventListener('click', disconnectAppFolder);
-
-  const btnCopyFiles = document.getElementById('btn-copy-files');
-  if (btnCopyFiles) btnCopyFiles.addEventListener('click', copyFilesToBgmFolder);
-
-  const btnCloseProgress = document.getElementById('btn-close-copy-progress');
-  if (btnCloseProgress) {
-    btnCloseProgress.addEventListener('click', () => {
-      document.getElementById('copy-progress-inline-section').style.display = 'none';
-    });
-  }
-
 });
 
 function applyOBSModes() {
@@ -482,33 +477,17 @@ function applyOBSModes() {
   document.body.classList.toggle('minimal-mode', cfgLayoutMinimal && !dock);
 }
 
-// Load manifest variables from bgm_manifest.js
+// 曲リストを読み込む。ドックは読み込む前に、ファイルの無い記録を取り除く（ローカル版は bgm フォルダを走査し直す）
 async function loadBgmManifest() {
-  if (useBrowserLibrary) {
-    if (!isPlayerRole) await ClockLibrary.pruneMissing();
-    bgmManifest = await ClockLibrary.loadManifest();
-    return;
-  }
-  if (window.bgmManifest) {
-    bgmManifest = {
-      bgmA: window.bgmManifest.bgmA || [],
-      bgmB: window.bgmManifest.bgmB || [],
-      bgmC: window.bgmManifest.bgmC || [],
-      bgmD: window.bgmManifest.bgmD || [],
-      bgmE: window.bgmManifest.bgmE || [],
-      bgmF: window.bgmManifest.bgmF || []
-    };
-  } else {
-    console.warn('bgm_manifest.js is not loaded or missing. Please run update_bgm.bat to generate it.');
-  }
+  if (!useBrowserLibrary) return;
+  if (!isPlayerRole) await ClockLibrary.pruneMissing();
+  bgmManifest = await ClockLibrary.loadManifest();
 }
 
-let saveConfigPromise = Promise.resolve();
-let isSaveConfigPending = false;
-let pendingConfigData = null;
 let saveDebounceTimeout = null;
+let saveConfigQueue = Promise.resolve();
 
-// Save settings to LocalStorage and disk (Debounced and Queued to prevent concurrent file locking and .crswap accumulation)
+// 設定を保存する。localStorage は同じ画面のドックとブラウザソースへの即時反映に使い、ローカル版はサーバーにも書き込む
 function saveConfig() {
   const configData = {
     segments: segments.map(s => ({
@@ -537,55 +516,16 @@ function saveConfig() {
   // Update window global cache
   window.bgmClockConfig = configData;
 
-  // Debounce the disk write by 300ms
-  if (saveDebounceTimeout) {
-    clearTimeout(saveDebounceTimeout);
-  }
-
+  if (!window.clockServer) return;
+  // 連続した変更は 300ms まとめてから、順番に書き込む
+  if (saveDebounceTimeout) clearTimeout(saveDebounceTimeout);
   saveDebounceTimeout = setTimeout(() => {
     saveDebounceTimeout = null;
-    triggerDiskSave(configData);
+    const data = window.bgmClockConfig;
+    saveConfigQueue = saveConfigQueue
+      .then(() => ClockLibrary.saveConfig(data))
+      .catch(err => console.error('Failed to save config:', err));
   }, 300);
-}
-
-// Queue writes to disk sequentially
-function triggerDiskSave(configData) {
-  if (!appFolderHandle) return;
-
-  pendingConfigData = configData;
-
-  if (isSaveConfigPending) {
-    return;
-  }
-
-  isSaveConfigPending = true;
-
-  saveConfigPromise = saveConfigPromise.then(async () => {
-    const dataToWrite = pendingConfigData;
-    pendingConfigData = null;
-
-    if (!dataToWrite) {
-      isSaveConfigPending = false;
-      return;
-    }
-
-    try {
-      if (await verifyPermission(appFolderHandle, true)) {
-        const configContent = `window.bgmClockConfig = ${JSON.stringify(dataToWrite, null, 4)};`;
-        const configFile = await appFolderHandle.getFileHandle('config.js', { create: true });
-        const writable = await configFile.createWritable();
-        await writable.write(configContent);
-        await writable.close();
-      }
-    } catch (e) {
-      console.error('Failed to save config.js to disk:', e);
-    } finally {
-      isSaveConfigPending = false;
-      if (pendingConfigData) {
-        triggerDiskSave(pendingConfigData);
-      }
-    }
-  });
 }
 
 // Load settings
@@ -593,12 +533,12 @@ function loadConfig() {
   try {
     const data = readSavedConfig() || DEFAULT_CONFIG;
 
-    if (data.segments && Array.isArray(data.segments)) {
-      segments = data.segments.map(s => ({
-        ...s,
-        files: []
-      }));
-    }
+    // 時間帯が無い設定では動けないので、既定のスケジュールを使う
+    const savedSegments = Array.isArray(data.segments) && data.segments.length > 0 ? data.segments : DEFAULT_CONFIG.segments;
+    segments = savedSegments.map(s => ({
+      ...s,
+      files: []
+    }));
     isShuffle = data.isShuffle !== undefined ? data.isShuffle : true;
     globalVolume = data.globalVolume !== undefined ? data.globalVolume : 0.7;
     
@@ -1791,101 +1731,8 @@ document.addEventListener('click', () => {
   });
 });
 
-// --- Serverless Folder Connection and File Copy API ---
-
-const DB_NAME = 'bgm_clock_db';
-const STORE_NAME = 'handles_store';
-const KEY_NAME = 'app_folder_handle';
-
-function getDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
-    };
-    request.onsuccess = (e) => resolve(e.target.result);
-    request.onerror = (e) => reject(e.target.error);
-  });
-}
-
-async function saveHandleToIndexedDB(handle) {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.put(handle, KEY_NAME);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function loadHandleFromIndexedDB() {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.get(KEY_NAME);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function removeHandleFromIndexedDB() {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.delete(KEY_NAME);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function initFolderConnection() {
-  const connSection = document.getElementById('folder-connection-section');
-  if (!connSection) return;
-
-  if (!isFileSystemAccessSupported) {
-    document.getElementById('faccess-unsupported-msg').style.display = 'block';
-    document.getElementById('faccess-supported-container').style.display = 'none';
-    return;
-  }
-
-  try {
-    const handle = await loadHandleFromIndexedDB();
-    if (handle) {
-      // Check permission
-      if (await handle.queryPermission({ mode: 'readwrite' }) === 'granted') {
-        appFolderHandle = handle;
-      } else {
-        // Handle exists but needs permission re-grant. Keep reference to request later.
-        appFolderHandle = handle;
-      }
-    }
-  } catch (e) {
-    console.error('Failed to load handle from IndexedDB:', e);
-  }
-  updateFolderConnectionUI(true);
-}
-
-async function verifyPermission(handle, readWrite) {
-  const options = {};
-  if (readWrite) {
-    options.mode = 'readwrite';
-  }
-  if ((await handle.queryPermission(options)) === 'granted') {
-    return true;
-  }
-  if ((await handle.requestPermission(options)) === 'granted') {
-    return true;
-  }
-  return false;
-}
-
-function updateFolderConnectionUI(scanDisk = false) {
+// --- 曲の登録欄 ---
+function updateFolderConnectionUI() {
   const activeSeg = segments[selectedSegmentIndex];
   const connSection = document.getElementById('folder-connection-section');
   if (!connSection) return;
@@ -1896,327 +1743,7 @@ function updateFolderConnectionUI(scanDisk = false) {
   }
 
   connSection.style.display = 'block';
-
-  if (useBrowserLibrary) {
-    renderLibraryList();
-    return;
-  }
-
-  const dis = document.getElementById('conn-state-disconnected');
-  const conn = document.getElementById('conn-state-connected');
-  const folderNameSpan = document.getElementById('connected-folder-name');
-
-  if (appFolderHandle) {
-    dis.style.display = 'none';
-    conn.style.display = 'block';
-    folderNameSpan.textContent = `✅ 接続: ${appFolderHandle.name} (宛先: ${activeSeg.folderPath})`;
-    updateConnectedFolderFilesList(scanDisk);
-  } else {
-    dis.style.display = 'block';
-    conn.style.display = 'none';
-    const fileListContainer = document.getElementById('connected-folder-files');
-    if (fileListContainer) fileListContainer.style.display = 'none';
-  }
-}
-
-async function updateConnectedFolderFilesList(scanDisk = false) {
-  const fileListContainer = document.getElementById('connected-folder-files');
-  const fileListUl = document.getElementById('connected-files-list');
-  if (!fileListContainer || !fileListUl) return;
-
-  const activeSeg = segments[selectedSegmentIndex];
-  if (!appFolderHandle || !activeSeg || !activeSeg.folderPath) {
-    fileListContainer.style.display = 'none';
-    return;
-  }
-
-  // もしディスクスキャンが要求された場合は、非同期でスキャンして manifest を同期する
-  if (scanDisk) {
-    (async () => {
-      try {
-        const bgmDir = await appFolderHandle.getDirectoryHandle('bgm');
-        const targetFolder = await bgmDir.getDirectoryHandle(activeSeg.folderPath);
-        const files = await scanBgmFolderRecursively(targetFolder, `bgm/${activeSeg.folderPath}`);
-        // メモリ同期
-        if (typeof bgmManifest !== 'undefined') {
-          bgmManifest[activeSeg.folderPath] = files;
-        }
-        if (typeof window.bgmManifest !== 'undefined') {
-          window.bgmManifest[activeSeg.folderPath] = files;
-        }
-        // メモリから再描画
-        updateConnectedFolderFilesList(false);
-      } catch (err) {
-        console.error('Failed to scan disk for file list:', err);
-      }
-    })();
-    return;
-  }
-
-  // メモリ（bgmManifest）から即座にリストを構築
-  const files = (typeof bgmManifest !== 'undefined' && bgmManifest[activeSeg.folderPath]) || [];
-
-  fileListUl.innerHTML = '';
-  if (files.length === 0) {
-    const li = document.createElement('li');
-    li.textContent = '登録されている曲はありません。';
-    li.style.color = 'var(--text-muted)';
-    li.style.padding = '8px 4px';
-    fileListUl.appendChild(li);
-  } else {
-    files.forEach(file => {
-      const li = document.createElement('li');
-      li.style.display = 'flex';
-      li.style.alignItems = 'center';
-      li.style.justifyContent = 'space-between';
-      li.style.padding = '6px 8px';
-      li.style.borderBottom = '1px solid var(--glass-border)';
-      li.style.gap = '8px';
-
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = file.name;
-      nameSpan.style.whiteSpace = 'nowrap';
-      nameSpan.style.overflow = 'hidden';
-      nameSpan.style.textOverflow = 'ellipsis';
-      nameSpan.style.flex = '1';
-
-      const actionArea = document.createElement('div');
-      actionArea.style.display = 'flex';
-      actionArea.style.alignItems = 'center';
-      actionArea.style.gap = '4px';
-
-      const deleteBtn = document.createElement('button');
-      deleteBtn.innerHTML = '✕';
-      deleteBtn.style.background = 'transparent';
-      deleteBtn.style.border = 'none';
-      deleteBtn.style.color = '#ff6b6b';
-      deleteBtn.style.cursor = 'pointer';
-      deleteBtn.style.fontWeight = 'bold';
-      deleteBtn.style.padding = '2px 6px';
-      deleteBtn.style.borderRadius = '4px';
-      deleteBtn.title = '削除';
-
-      deleteBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        actionArea.innerHTML = '';
-        
-        const confirmText = document.createElement('span');
-        confirmText.textContent = '削除？';
-        confirmText.style.color = '#ff6b6b';
-        confirmText.style.fontSize = '0.75rem';
-        confirmText.style.fontWeight = 'bold';
-        confirmText.style.marginRight = '2px';
-        
-        const yesBtn = document.createElement('button');
-        yesBtn.textContent = 'はい';
-        yesBtn.style.background = '#ff6b6b';
-        yesBtn.style.color = '#ffffff';
-        yesBtn.style.border = 'none';
-        yesBtn.style.borderRadius = '3px';
-        yesBtn.style.padding = '2px 6px';
-        yesBtn.style.cursor = 'pointer';
-        yesBtn.style.fontSize = '0.7rem';
-        yesBtn.addEventListener('click', () => {
-          deleteFileFromFolder(activeSeg.folderPath, file.name);
-        });
-
-        const noBtn = document.createElement('button');
-        noBtn.textContent = 'いいえ';
-        noBtn.style.background = 'rgba(255,255,255,0.1)';
-        noBtn.style.color = 'var(--text-main)';
-        noBtn.style.border = '1px solid var(--glass-border)';
-        noBtn.style.borderRadius = '3px';
-        noBtn.style.padding = '2px 6px';
-        noBtn.style.cursor = 'pointer';
-        noBtn.style.fontSize = '0.7rem';
-        noBtn.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          updateConnectedFolderFilesList(false);
-        });
-
-        actionArea.appendChild(confirmText);
-        actionArea.appendChild(yesBtn);
-        actionArea.appendChild(noBtn);
-      });
-
-      actionArea.appendChild(deleteBtn);
-      li.appendChild(nameSpan);
-      li.appendChild(actionArea);
-      fileListUl.appendChild(li);
-    });
-  }
-  fileListContainer.style.display = 'block';
-}
-
-async function deleteFileFromFolder(folderPath, fileName) {
-  try {
-    if (!appFolderHandle) return;
-    if (!await verifyPermission(appFolderHandle, true)) {
-      alert('書き込み権限がありません。');
-      return;
-    }
-
-    // 1. メモリ上のキャッシュから即座に取り除く
-    if (typeof bgmManifest !== 'undefined' && bgmManifest[folderPath]) {
-      bgmManifest[folderPath] = bgmManifest[folderPath].filter(f => f.name !== fileName);
-    }
-    if (typeof window.bgmManifest !== 'undefined' && window.bgmManifest[folderPath]) {
-      window.bgmManifest[folderPath] = window.bgmManifest[folderPath].filter(f => f.name !== fileName);
-    }
-
-    // 2. アプリ全体の読み込み曲数表示やメモリを即時に同期
-    for (let s of segments) {
-      loadFilesForSegment(s);
-    }
-    const activeSeg = segments[selectedSegmentIndex];
-    updateFolderStatus(activeSeg);
-    if (selectedSegmentIndex === activeSegmentIndex) {
-      updateActiveTimeZone(true);
-    }
-
-    // 3. スキャンを挟まずに即座にUIリストから項目を削除（爆速反映）
-    updateConnectedFolderFilesList(false);
-
-    // 4. ディスク削除とマニフェスト再生成は裏（バックグラウンド）で非同期実行
-    (async () => {
-      try {
-        const bgmDir = await appFolderHandle.getDirectoryHandle('bgm');
-        const targetFolder = await bgmDir.getDirectoryHandle(folderPath);
-        await targetFolder.removeEntry(fileName);
-        await rebuildBgmManifest();
-      } catch (e) {
-        console.error('Failed to execute disk removal/rebuild in background:', e);
-      }
-    })();
-  } catch (err) {
-    console.error('Failed to delete file:', err);
-    alert('ファイルの削除に失敗しました: ' + err.message);
-  }
-}
-
-async function connectAppFolder() {
-  try {
-    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-    let hasIndex = false;
-    let hasManifest = false;
-    for await (const entry of handle.values()) {
-      if (entry.name === 'index.html' && entry.kind === 'file') hasIndex = true;
-      if (entry.name === 'bgm_manifest.js' && entry.kind === 'file') hasManifest = true;
-    }
-
-    if (!hasIndex) {
-      alert(`「${handle.name}」には index.html がありません。Clock Player の index.html が入っているフォルダを選んでください。`);
-      return;
-    }
-
-    // ダウンロード直後は bgm フォルダと bgm_manifest.js が無いので、ここで用意する
-    const bgmDir = await handle.getDirectoryHandle('bgm', { create: true });
-    for (const folder of ['bgmA', 'bgmB', 'bgmC', 'bgmD', 'bgmE', 'bgmF']) {
-      await bgmDir.getDirectoryHandle(folder, { create: true });
-    }
-
-    await saveHandleToIndexedDB(handle);
-    appFolderHandle = handle;
-    if (!hasManifest) {
-      await rebuildBgmManifest();
-      for (const s of segments) loadFilesForSegment(s);
-    }
-    updateFolderConnectionUI(true);
-    await saveConfig();
-  } catch (err) {
-    console.error('Folder picker error:', err);
-    if (err.name !== 'AbortError') {
-      alert('フォルダの接続に失敗しました: ' + err.message);
-    }
-  }
-}
-
-async function disconnectAppFolder() {
-  if (confirm('フォルダ接続を解除しますか？')) {
-    await removeHandleFromIndexedDB();
-    appFolderHandle = null;
-    updateFolderConnectionUI();
-  }
-}
-
-// Rebuild manifest by scanning local disk
-async function rebuildBgmManifest() {
-  if (!appFolderHandle) return;
-  try {
-    const bgmDir = await appFolderHandle.getDirectoryHandle('bgm');
-    const folders = ['bgmA', 'bgmB', 'bgmC', 'bgmD', 'bgmE', 'bgmF'];
-    const newManifest = {};
-
-    for (const folder of folders) {
-      newManifest[folder] = [];
-      try {
-        const folderHandle = await bgmDir.getDirectoryHandle(folder);
-        const files = await scanBgmFolderRecursively(folderHandle, `bgm/${folder}`);
-        newManifest[folder] = files;
-      } catch (err) {
-        console.warn(`BGM folder ${folder} could not be scanned:`, err);
-      }
-    }
-
-    // Write file content
-    const manifestContent = `window.bgmManifest = ${JSON.stringify(newManifest, null, 4)};`;
-    const manifestFile = await appFolderHandle.getFileHandle('bgm_manifest.js', { create: true });
-    const writable = await manifestFile.createWritable();
-    await writable.write(manifestContent);
-    await writable.close();
-
-    // Reassign globally
-    bgmManifest = newManifest;
-    window.bgmManifest = newManifest;
-  } catch (err) {
-    console.error('Failed to rebuild manifest:', err);
-    throw err;
-  }
-}
-
-async function scanBgmFolderRecursively(dirHandle, currentPath) {
-  let results = [];
-  for await (const entry of dirHandle.values()) {
-    if (entry.kind === 'file') {
-      if (entry.name.match(/\.(mp3|wav|ogg|m4a|aac|flac)$/i)) {
-        let artist = "";
-        let title = "";
-        try {
-          const fileObj = await entry.getFile();
-          const meta = await extractAudioMetadata(fileObj);
-          if (meta) {
-            artist = meta.artist || "";
-            title = meta.title || "";
-          }
-        } catch (e) {
-          console.warn("Could not read file handle metadata:", e);
-        }
-
-        if (!title) {
-          const baseName = entry.name.replace(/\.[^/.]+$/, "");
-          const match = baseName.match(/^(.+?)\s*-\s*(.+)$/);
-          if (match) {
-            artist = match[1].trim();
-            title = match[2].trim();
-          } else {
-            title = baseName;
-          }
-        }
-
-        results.push({
-          name: entry.name,
-          path: `${currentPath}/${entry.name}`,
-          artist: artist,
-          title: title
-        });
-      }
-    } else if (entry.kind === 'directory') {
-      const subResults = await scanBgmFolderRecursively(entry, `${currentPath}/${entry.name}`);
-      results = results.concat(subResults);
-    }
-  }
-  results.sort((a, b) => a.name.localeCompare(b.name));
-  return results;
+  if (useBrowserLibrary) renderLibraryList();
 }
 
 // --- Client-Side Audio Metadata Extraction ---
@@ -2481,161 +2008,8 @@ function updateTrackTitleDisplay(file) {
 }
 
 
-// Copy Files Utility
-async function copyFilesToBgmFolder() {
-  const activeSeg = segments[selectedSegmentIndex];
-  if (!activeSeg || !activeSeg.folderPath) return;
-
-  if (!appFolderHandle) {
-    alert('アプリフォルダを先に接続してください。');
-    return;
-  }
-
-  // Verify permission
-  if (!await verifyPermission(appFolderHandle, true)) {
-    alert('書き込み権限がありません。');
-    return;
-  }
-
-  try {
-    const fileHandles = await window.showOpenFilePicker({
-      multiple: true,
-      types: [{
-        description: '音楽ファイル',
-        accept: {
-          'audio/*': ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac']
-        }
-      }]
-    });
-
-    if (fileHandles.length === 0) return;
-
-    showProgressModal(activeSeg.folderPath);
-    updateProgressLog(`コピーを開始しています...\n選択ファイル数: ${fileHandles.length}件\n`);
-    initProgressBar(fileHandles.length);
-
-    const bgmDir = await appFolderHandle.getDirectoryHandle('bgm');
-    const targetFolder = await bgmDir.getDirectoryHandle(activeSeg.folderPath);
-
-    let copiedCount = 0;
-
-    for (const srcHandle of fileHandles) {
-      try {
-        const file = await srcHandle.getFile();
-        
-        // Resolve name conflict
-        let destName = file.name;
-        let extIdx = destName.lastIndexOf('.');
-        let base = extIdx !== -1 ? destName.substring(0, extIdx) : destName;
-        let ext = extIdx !== -1 ? destName.substring(extIdx) : '';
-        let counter = 1;
-
-        while (true) {
-          try {
-            await targetFolder.getFileHandle(destName);
-            destName = `${base} (${counter})${ext}`;
-            counter++;
-          } catch (e) {
-            break;
-          }
-        }
-
-        updateProgressLog(`コピー中: ${file.name} -> ${destName}...`);
-        const destFileHandle = await targetFolder.getFileHandle(destName, { create: true });
-        // 曲全体をメモリに載せずに少しずつ書き込む（pipeTo が書き込み後に閉じる）
-        await file.stream().pipeTo(await destFileHandle.createWritable());
-
-        copiedCount++;
-        updateProgressLog(' [完了]\n');
-        tickProgressBar(copiedCount);
-      } catch (err) {
-        updateProgressLog(` [エラー: ${err.message}]\n`);
-      }
-    }
-
-    updateProgressLog('\nプレイリストとマニフェストファイルを自動生成中...');
-    await rebuildBgmManifest();
-    
-    // Refresh memory
-    for (let s of segments) {
-      loadFilesForSegment(s);
-    }
-    updateFolderStatus(activeSeg);
-    if (selectedSegmentIndex === activeSegmentIndex) {
-      updateActiveTimeZone(true);
-    }
-
-    await updateConnectedFolderFilesList();
-
-    updateProgressLog(' [完了]\n\nすべてのコピーが完了しました！');
-    finishProgressModal();
-  } catch (err) {
-    if (err.name !== 'AbortError') {
-      console.error('File copy failed:', err);
-      alert('コピー中にエラーが発生しました: ' + err.message);
-    }
-  }
-}
-
-// Progress Modal Controllers
-let progressBarTotal = 0;
-
-function showProgressModal(destFolder) {
-  const container = document.getElementById('copy-progress-inline-section');
-  const closeBtn = document.getElementById('btn-close-copy-progress');
-  const logEl = document.getElementById('copy-progress-log');
-  const barContainer = document.getElementById('copy-progress-bar-container');
-  const barFill = document.getElementById('copy-progress-bar-fill');
-
-  logEl.textContent = '';
-  barContainer.style.display = 'none';
-  barFill.style.width = '0%';
-  closeBtn.style.display = 'none';
-  if (container) {
-    container.style.display = 'block';
-  }
-}
-
-function updateProgressLog(text) {
-  const logEl = document.getElementById('copy-progress-log');
-  if (logEl) {
-    logEl.textContent += text;
-    logEl.scrollTop = logEl.scrollHeight;
-  }
-}
-
-function initProgressBar(total) {
-  progressBarTotal = total;
-  const barContainer = document.getElementById('copy-progress-bar-container');
-  const barFill = document.getElementById('copy-progress-bar-fill');
-  if (barContainer && barFill) {
-    barContainer.style.display = 'block';
-    barFill.style.width = '0%';
-  }
-}
-
-function tickProgressBar(current) {
-  const barFill = document.getElementById('copy-progress-bar-fill');
-  if (barFill && progressBarTotal > 0) {
-    const pct = Math.round((current / progressBarTotal) * 100);
-    barFill.style.width = `${pct}%`;
-  }
-}
-
-function finishProgressModal() {
-  const closeBtn = document.getElementById('btn-close-copy-progress');
-  if (closeBtn) {
-    closeBtn.style.display = 'inline-block';
-  }
-}
-
-
-// --- ブラウザソース用 URL（設定パネル先頭） ---
-function initSourceUrl() {
-  const input = document.getElementById('source-url');
-  const btn = document.getElementById('btn-copy-source-url');
-  if (!input || !btn) return;
-  input.value = new URL('obs.html', location.href).href;
+// --- OBS に登録する URL（曲の登録欄の下） ---
+function bindCopyButton(input, btn) {
   input.addEventListener('focus', () => input.select());
   btn.addEventListener('click', async () => {
     try {
@@ -2648,6 +2022,74 @@ function initSourceUrl() {
     btn.textContent = 'コピーしました';
     setTimeout(() => { btn.textContent = 'コピー'; }, 1500);
   });
+}
+
+function initSourceUrl() {
+  const input = document.getElementById('source-url');
+  const btn = document.getElementById('btn-copy-source-url');
+  if (!input || !btn) return;
+  bindCopyButton(input, btn);
+
+  if (!window.clockServer) {
+    input.value = new URL('obs.html', location.href).href;
+    return;
+  }
+  // ローカル版はポートが変わっても追従できるよう、ポートを含まない入口のページを登録してもらう
+  input.value = window.clockServer.sourcePath;
+  const label = document.getElementById('source-url-label');
+  if (label) label.textContent = 'ブラウザソース（ローカルファイル）';
+  const dockRow = document.getElementById('dock-url-row');
+  const dockInput = document.getElementById('dock-url');
+  const dockBtn = document.getElementById('btn-copy-dock-url');
+  if (dockRow && dockInput && dockBtn) {
+    dockRow.style.display = '';
+    dockInput.value = window.clockServer.dockUrl;
+    bindCopyButton(dockInput, dockBtn);
+  }
+}
+
+// --- サーバーを通さずに開いたときの案内 ---
+// ダウンロードしたフォルダの場所から、OBS に登録する入口のページの場所を組み立てて示す
+function showLocalGuide() {
+  const dirPath = decodeURIComponent(location.pathname.replace(/[^/]*$/, ''));
+  const filePath = dirPath.replace(/^\/([A-Za-z]:)/, '$1');
+  const isWindowsPath = filePath !== dirPath;
+  const sourcePath = (isWindowsPath ? filePath.replace(/\//g, '\\') : filePath) + 'local_obs.html';
+  const dockUrl = encodeURI('file://' + dirPath + 'local_dock.html');
+
+  const guide = document.createElement('main');
+  guide.className = 'local-guide';
+  guide.innerHTML = `
+    <h1>Clock Player</h1>
+    <ol>
+      <li><strong>start.bat</strong> を実行する<span class="local-guide-alt">ウィンドウを出さない場合は start_background.bat、止めるときは stop_background.bat</span></li>
+      <li>
+        <div class="source-url-row">
+          <span class="input-label">ブラウザソース（ローカルファイル）</span>
+          <input type="text" class="text-input" readonly>
+          <button class="action-btn">コピー</button>
+        </div>
+      </li>
+      <li>
+        <div class="source-url-row">
+          <span class="input-label">カスタムブラウザドック</span>
+          <input type="text" class="text-input" readonly>
+          <button class="action-btn">コピー</button>
+        </div>
+      </li>
+      <li>ブラウザで使うときは、start.bat のウィンドウに出る <strong>http://127.0.0.1:ポート/</strong> を開く</li>
+    </ol>`;
+  const rows = guide.querySelectorAll('.source-url-row');
+  [sourcePath, dockUrl].forEach((value, i) => {
+    const input = rows[i].querySelector('input');
+    input.value = value;
+    bindCopyButton(input, rows[i].querySelector('button'));
+  });
+
+  const container = document.querySelector('.glass-container');
+  if (container) container.style.display = 'none';
+  document.body.classList.remove('transparent-mode', 'hide-controls-mode', 'keep-window-bg-mode', 'swap-panels-mode', 'minimal-mode');
+  document.body.appendChild(guide);
 }
 
 // --- Dock ⇄ Browser Source Sync ---
@@ -2734,7 +2176,7 @@ function renderRemoteState(state) {
   }
 }
 
-// 他の画面で保存された設定を取り込む（ブラウザライブラリ利用時のみ。ローカル版は config.js が正）
+// 他の画面で保存された設定を取り込む
 function applyExternalConfig() {
   const prevSeg = segments[activeSegmentIndex];
   const prevFolder = prevSeg ? prevSeg.folderPath : null;
@@ -2825,7 +2267,12 @@ function initSync() {
 
   if (useBrowserLibrary) {
     window.addEventListener('storage', (e) => {
-      if (e.key === 'bgm_clock_config') applyExternalConfig();
+      if (e.key !== 'bgm_clock_config') return;
+      // ローカル版の正本はサーバーから読んだ window.bgmClockConfig なので、届いた設定で置き換えてから反映する
+      if (window.clockServer && e.newValue) {
+        try { window.bgmClockConfig = JSON.parse(e.newValue); } catch (err) { return; }
+      }
+      applyExternalConfig();
     });
   }
 }
@@ -2938,12 +2385,22 @@ async function pickFolderToLibrary() {
 function initBrowserLibraryUI() {
   // 取り込んだ曲をブラウザに消されにくくする
   ClockLibrary.requestPersist().then(refreshLibraryUsage);
-  const faccess = document.getElementById('faccess-supported-container');
-  const unsupported = document.getElementById('faccess-unsupported-msg');
   const library = document.getElementById('library-container');
-  if (faccess) faccess.style.display = 'none';
-  if (unsupported) unsupported.style.display = 'none';
   if (library) library.style.display = 'block';
+
+  // ローカル版は bgm フォルダに直接入れた曲を読み込み直せる
+  const rescanBtn = document.getElementById('btn-library-rescan');
+  if (rescanBtn && ClockLibrary.canRescan) {
+    rescanBtn.style.display = '';
+    rescanBtn.addEventListener('click', async () => {
+      try {
+        await ClockLibrary.pruneMissing();
+      } catch (err) {
+        alert('曲を読み込み直せませんでした: ' + err.message);
+      }
+      notifyLibraryUpdated();
+    });
+  }
 
   const filesInput = document.getElementById('library-files-input');
   const dirInput = document.getElementById('library-dir-input');
@@ -2971,7 +2428,7 @@ function initBrowserLibraryUI() {
   const clearAllBtn = document.getElementById('btn-library-clear-all');
   if (clearAllBtn) {
     clearAllBtn.addEventListener('click', async () => {
-      if (!confirm('取り込んだ曲をすべて削除しますか？')) return;
+      if (!confirm(window.clockServer ? 'bgm フォルダの曲をすべて削除しますか？' : '取り込んだ曲をすべて削除しますか？')) return;
       await ClockLibrary.clearAll();
       notifyLibraryUpdated();
     });

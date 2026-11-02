@@ -1,16 +1,98 @@
-// --- Browser Library: GitHub Pages など bgm フォルダを置けない環境向けの曲置き場 ---
-// 曲はオリジンごとの保存領域（Origin Private File System）に bgm/<フォルダ>/<ファイル名> で置く。
-// OBS のカスタムブラウザドックとブラウザソースは同じオリジンなら保存領域を共有するため、
-// ドックで取り込んだ曲をブラウザソースの obs.html から再生できる。
-window.ClockLibrary = (() => {
+// --- 曲置き場 ---
+// ローカル版（server.ps1 から配信）: 曲はダウンロードしたフォルダの bgm/<フォルダ>/ に、設定は data/ に置く。
+//   サーバーが配る config.js が window.clockServer を定めるので、それで見分ける。
+// GitHub Pages 版: 曲はオリジンごとの保存領域（Origin Private File System）に bgm/<フォルダ>/<ファイル名> で置く。
+//   OBS のカスタムブラウザドックとブラウザソースは同じオリジンなら保存領域を共有するため、
+//   ドックで取り込んだ曲をブラウザソースの obs.html から再生できる。
+// どちらも同じ関数をそろえ、index.js からは区別せずに使う。
+window.ClockServerLibrary = (() => {
+  const API_HEADERS = { 'X-ClockPlayer': '1' };
+
+  async function request(method, url, options = {}) {
+    const res = await fetch(url, Object.assign({ method, cache: 'no-store' }, options, {
+      headers: Object.assign({}, API_HEADERS, options.headers || {})
+    }));
+    if (!res.ok) {
+      let message = `${res.status} ${res.statusText}`;
+      try { message = (await res.json()).error || message; } catch (e) { /* 本文が JSON でない */ }
+      throw new Error(message);
+    }
+    return res.json();
+  }
+
+  const query = (params) => Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+
+  async function loadManifest() {
+    return request('GET', 'api/manifest');
+  }
+
+  // bgm フォルダを走査し直す。手で入れた曲を拾い、無くなった曲を外す。外した件数を返す
+  async function pruneMissing() {
+    return (await request('POST', 'api/rescan')).removed;
+  }
+
+  async function importFiles(folder, files, readMeta, onProgress) {
+    const AUDIO_PATTERN = /\.(mp3|wav|ogg|m4a|aac|flac)$/i;
+    const audioFiles = Array.from(files).filter(f => AUDIO_PATTERN.test(f.name));
+    let manifest = null;
+    for (let i = 0; i < audioFiles.length; i++) {
+      const file = audioFiles[i];
+      let meta = null;
+      try { meta = await readMeta(file); } catch (e) { /* メタデータが読めなくても取り込む */ }
+      // File をそのまま本文に渡すと、曲全体をメモリに載せずに送れる
+      manifest = await request('PUT', `api/files?${query({
+        folder,
+        name: file.name,
+        artist: (meta && meta.artist) || '',
+        title: (meta && meta.title) || ''
+      })}`, { body: file });
+      if (onProgress) onProgress(i + 1, audioFiles.length, file.name);
+    }
+    return manifest || loadManifest();
+  }
+
+  const removeFile = (folder, name) => request('DELETE', `api/files?${query({ folder, name })}`);
+  const clearFolder = (folder) => request('DELETE', `api/folder?${query({ folder })}`);
+  const clearAll = () => request('DELETE', 'api/all');
+
+  async function getUsage() {
+    try {
+      return (await request('GET', 'api/usage')).usage;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  // ディスク上のファイルなので、ブラウザに消されることはない
+  const requestPersist = async () => true;
+  const isPersisted = async () => true;
+
+  async function getTrackUrl(path) {
+    const url = path.split('/').map(encodeURIComponent).join('/');
+    const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+    if (res.status === 404) throw new DOMException(`${path} not found`, 'NotFoundError');
+    return url;
+  }
+
+  const saveConfig = (config) => request('PUT', 'api/config', { body: JSON.stringify(config) });
+  const savePresets = (presets) => request('PUT', 'api/presets', { body: JSON.stringify(presets) });
+
+  return {
+    isSupported: true, isActive: true, canRescan: true,
+    loadManifest, pruneMissing, importFiles, removeFile, clearFolder, clearAll,
+    getUsage, requestPersist, isPersisted, getTrackUrl, saveConfig, savePresets
+  };
+})();
+
+window.ClockLibrary = window.clockServer ? window.ClockServerLibrary : (() => {
   const FOLDERS = ['bgmA', 'bgmB', 'bgmC', 'bgmD', 'bgmE', 'bgmF'];
   const MANIFEST_FILE = 'manifest.json';
   const AUDIO_PATTERN = /\.(mp3|wav|ogg|m4a|aac|flac)$/i;
 
   const isSupported = !!(navigator.storage && typeof navigator.storage.getDirectory === 'function');
 
-  // bgm_manifest.js が無く http(s) で配信されているときだけライブラリを使う
-  const isActive = isSupported && !window.bgmManifest && /^https?:$/.test(location.protocol);
+  // http(s) で配信されているときだけ使う（index.html を直接開いたときは使い方の案内を出す）
+  const isActive = isSupported && /^https?:$/.test(location.protocol) && location.hostname !== 'absolute';
 
   let currentObjectUrl = null;
 
@@ -193,5 +275,5 @@ window.ClockLibrary = (() => {
     return currentObjectUrl;
   }
 
-  return { isSupported, isActive, loadManifest, pruneMissing, importFiles, removeFile, clearFolder, clearAll, getUsage, requestPersist, isPersisted, getTrackUrl };
+  return { isSupported, isActive, canRescan: false, loadManifest, pruneMissing, importFiles, removeFile, clearFolder, clearAll, getUsage, requestPersist, isPersisted, getTrackUrl };
 })();
