@@ -277,7 +277,7 @@
   <section id="overview">
     <h2>アプリ概要</h2>
     <p>
-      本アプリは、時間帯（朝、昼、夕方、夜など）に応じて、対応するフォルダに配置された音楽ファイルを自動的に切り替えて再生する、時計機能付きのWebブラウザ型ミュージックプレイヤーです。
+      本アプリは時間帯（朝、昼、夕方、夜など）に応じて、対応するフォルダに配置された音楽ファイルを自動的に切り替えて再生する、時計機能付きのWebブラウザ型ミュージックプレイヤーです。
     </p>
   </section>
 
@@ -299,11 +299,11 @@
       </div>
       <div class="file-item">
         <span class="file-name">local_obs.html</span>
-        <span class="file-desc">OBS のブラウザソースに登録する入口</span>
+        <span class="file-desc">OBS のブラウザソースに登録するページ</span>
       </div>
       <div class="file-item">
         <span class="file-name">local_dock.html</span>
-        <span class="file-desc">OBS のカスタムブラウザドックに登録する入口</span>
+        <span class="file-desc">OBS のカスタムブラウザドックに登録するページ</span>
       </div>
       <div class="file-item">
         <span class="file-name">index.html / obs.html</span>
@@ -352,7 +352,7 @@
         <div>
           <div class="step-title">ウィンドウを出さずに使う</div>
           <div class="step-desc">
-            <strong>start_background.bat</strong> で、ウィンドウを出さずに起動します。サーバーが起動するとウィンドウはすぐに閉じ、サーバーはウィンドウを持たずに動き続けます。止めるときは <strong>stop_background.bat</strong> を実行します。OBS に登録する場所は、ドックの曲の登録欄の下に表示されます。
+            <strong>start_background.bat</strong> で、ウィンドウを出さずに起動します。サーバーが起動するとウィンドウはすぐに閉じ、サーバーはウィンドウを持たずに動き続けます。止めるときは <strong>stop_background.bat</strong> を実行します。OBS に登録する場所はドックの曲の登録欄の下に表示されます。
           </div>
         </div>
       </div>
@@ -370,7 +370,7 @@
     </div>
     <div class="alert alert-info">
       <h3>ポート番号</h3>
-      <p>サーバーは初期設定のポート 8137 で起動し、ほかのソフトが使っていれば 8138〜8146 を順に試します。OBS に登録する入口（<code>local_obs.html</code> / <code>local_dock.html</code>）は開いた時点のポートを探して移るので、登録し直す必要はありません。OBS を開いたままサーバーを再起動してポートが変わった場合だけ、ソースとドックの再読み込みが必要です。初期設定のポートは <code>data/server.json</code> で変えられます。</p>
+      <p>サーバーは初期設定のポート 8137 で起動し、ほかのソフトが使っていれば 8138〜8146 を順に試します。OBS に登録するページ（<code>local_obs.html</code> / <code>local_dock.html</code>）は開いたときにサーバーのポートを探して移るので、登録し直す必要はありません。OBS を開いたままサーバーを再起動してポートが変わった場合だけ、ソースとドックの再読み込みが必要です。初期設定のポートは <code>data/server.json</code> で変えられます。</p>
     </div>
   </section>
 
@@ -411,7 +411,7 @@
     <figure class="shot"><img src="docs/manual/schedule.png" alt="24時間スライダーとプリセット" loading="lazy"></figure>
     <p>
       <strong>■ プリセット:</strong><br>
-      用意されたプリセットを切り替えるか、<code>sample_preset.json</code> を設定パネルの「ファイルを取り込む」からインポートして適用します。
+      用意されたプリセットを切り替えて適用します。
     </p>
   </section>
 
@@ -437,7 +437,7 @@
         <div>
           <div class="step-title">ドックの追加</div>
           <div class="step-desc">
-            メニューの <strong>「ドック」→「カスタムブラウザドック」</strong> で、URL に start.bat のウィンドウに表示された <code>file:///…/local_dock.html</code> を入れます。この2つの場所は、設定パネルの下の欄からもコピーできます。
+            メニューの <strong>「ドック」→「カスタムブラウザドック」</strong> で、URL に start.bat のウィンドウに表示された <code>file:///…/local_dock.html</code> を入れます。この2つの場所は設定パネルの下の欄からもコピーできます。
           </div>
           <figure class="shot"><img src="docs/manual/obs-urls.png" alt="ブラウザソースとドックに登録する場所" loading="lazy"></figure>
           <figure class="shot shot-narrow"><img src="docs/manual/dock.png" alt="OBS のドックの表示" loading="lazy"></figure>
@@ -449,7 +449,7 @@
         <div>
           <div class="step-title">サイズと音声設定</div>
           <div class="step-desc">
-            プレイヤーは画面左上に整列され、ドロップシャドウ（影）がきれいに表示されるよう <strong><code>20px</code> の外側マージン</strong> が確保されています。<br>ブラウザソースのサイズは、横幅 <strong><code>950</code></strong>、縦幅はミニマルモードであれば <strong><code>150</code></strong> （通常表示の場合は <strong><code>440</code></strong> など）に設定することをおすすめします。<br>BGM の音声を OBS 経由で配信・制御したい場合は、<strong>「OBSで音声を制御する」</strong> にチェックを入れます。
+            プレイヤーは画面左上に整列され、ドロップシャドウがきれいに表示されるよう <strong><code>20px</code> の外側マージン</strong> が確保されています。<br>ブラウザソースのサイズは、横幅 <strong><code>950</code></strong>、縦幅はミニマルモードであれば <strong><code>150</code></strong> （通常表示の場合は <strong><code>440</code></strong> など）に設定することをおすすめします。<br>BGM の音声を OBS 経由で配信・制御したい場合は、<strong>「OBSで音声を制御する」</strong> にチェックを入れます。
           </div>
         </div>
       </div>
@@ -469,7 +469,7 @@
         <div>
           <div class="step-title">ドックの追加</div>
           <div class="step-desc">
-            OBS のメニュー <strong>「ドック」→「カスタムブラウザドック」</strong> で、URL に <code>https://tomozow.github.io/ClockPlayer/index.html?dock</code> を指定します。ドックでは時計や音量を省き、曲名・操作ボタンと設定だけの簡易表示になります。見た目は OBS のプレビューで確認してください。
+            OBS のメニュー <strong>「ドック」→「カスタムブラウザドック」</strong> で、URL に <code>https://tomozow.github.io/ClockPlayer/index.html?dock</code> を指定します。ドックでは時計を省き、曲名・操作ボタン・音量と設定だけの簡易表示になります。見た目は OBS のプレビューで確認してください。
           </div>
         </div>
       </div>
@@ -495,7 +495,7 @@
     </div>
     <div class="alert alert-info">
       <h3>保存領域の容量</h3>
-      <p>取り込んだ曲は曲の容量分だけディスクを使います。リスト右の「✕」で1曲ずつ、「bgmA を空にする」でフォルダごと、「すべて削除」でまとめて削除できます。使用量はリストの左下に表示されます。</p>
+      <p>取り込んだ曲は、その容量の分だけディスクを使います。リスト右の「✕」で1曲ずつ、「bgmA を空にする」でフォルダごと、「すべて削除」でまとめて削除できます。使用量はリストの左下に表示されます。</p>
     </div>
   </section>
 
@@ -504,8 +504,8 @@
     <h2>注意事項</h2>
 
     <div class="alert alert-info">
-      <h3>以前の版から移行する場合</h3>
-      <p>0.2.0 から、ローカル版はサーバーを通して使う形になりました。<code>bgm</code> フォルダの曲はそのまま使えます。OBS のブラウザソースは <code>obs.html</code> から <code>local_obs.html</code> に登録し直してください。設定は、以前の版の <code>config.js</code> をこのフォルダに上書きコピーしてから初めて起動すると引き継がれます。ブラウザに保存していたプリセットは引き継がれないので、以前の版で書き出して取り込んでください。</p>
+      <h3>以前のバージョンから移行する場合</h3>
+      <p>0.2.0 から、ローカル版はサーバーを通して使う形になりました。<code>bgm</code> フォルダの曲はそのまま使えます。OBS のブラウザソースは <code>obs.html</code> から <code>local_obs.html</code> に登録し直してください。設定は、以前のバージョンの <code>config.js</code> をこのフォルダに上書きコピーしてから初めて起動すると引き継がれます。ブラウザに保存していたプリセットは引き継がれないので、以前のバージョンで書き出して取り込んでください。</p>
     </div>
   </section>
 
