@@ -24,7 +24,7 @@
 
 ダウンロードして使う版です。曲と設定はダウンロードしたフォルダの中に保存されるので、ブラウザのキャッシュが消えても失われません。Windows の PowerShell で小さなサーバーを動かすため、追加のインストールは要りません。
 
-1. このリポジトリをダウンロードして展開し、`start.bat` を実行します
+1. [Releases](https://github.com/Tomozow/ClockPlayer/releases/latest) から `ClockPlayer-v<版>.zip` をダウンロードして展開し、`start.bat` を実行します
    - ウィンドウにポート番号と、OBS に登録する場所が表示されます。ウィンドウを閉じると停止します
    - ウィンドウを出さずに動かす場合は `start_background.bat`、止めるときは `stop_background.bat` を実行します
 2. OBS に登録します

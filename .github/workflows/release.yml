@@ -1,0 +1,58 @@
+# v0.2.0 のようなタグを push すると、ローカル版に必要なファイルだけを ZIP にまとめて Release を作る。
+# 説明文には CHANGELOG.md の該当する版の項目を使う。
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build zip
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          DIST="dist/ClockPlayer"
+          FILES=(
+            index.html index.css index.js obs.html library.js config.js favicon.svg
+            server.ps1 start.bat start_background.bat stop_background.bat
+            local_obs.html local_dock.html local.js
+            README.html
+          )
+          rm -rf dist
+          mkdir -p "$DIST"
+          cp "${FILES[@]}" "$DIST/"
+          # 初回起動の前に曲を入れられるよう、空の bgm フォルダも入れる
+          for f in bgmA bgmB bgmC bgmD bgmE bgmF; do mkdir -p "$DIST/bgm/$f"; done
+          (cd dist && zip -r -X "ClockPlayer-${TAG}.zip" ClockPlayer)
+          unzip -l "dist/ClockPlayer-${TAG}.zip"
+
+      - name: Extract release notes
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          # 「## [0.2.0]」から次の「## [」の手前までを取り出す
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > dist/notes.md
+          if ! grep -q '[^[:space:]]' dist/notes.md; then
+            echo "CHANGELOG.md に ${VERSION} の項目がありません" >&2
+            exit 1
+          fi
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "dist/ClockPlayer-${GITHUB_REF_NAME}.zip" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file dist/notes.md
