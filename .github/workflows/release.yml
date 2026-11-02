@@ -1,10 +1,21 @@
-# v0.2.0 のようなタグを push すると、ローカル版に必要なファイルだけを ZIP にまとめて Release を作る。
-# 説明文には CHANGELOG.md の該当する版の項目を使う。
+# ローカル版に必要なファイルだけを ZIP にまとめて Release を作る。説明文には CHANGELOG.md の該当する版の項目を使う。
+# 動かし方は2通り:
+#   - v0.2.0 のようなタグを push する
+#   - Actions の画面から「Run workflow」でタグ名を入れて実行する（実行した時点のコミットにタグを付ける）
 name: Release
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'タグ名（例: v0.2.0）'
+        required: true
+
+env:
+  # 入力値はコマンドに直接埋め込まず、環境変数として渡す
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 permissions:
   contents: write
@@ -15,10 +26,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check tag
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "タグ名は v0.2.0 の形にしてください: $TAG" >&2
+            exit 1
+          fi
+
       - name: Build zip
         run: |
           set -euo pipefail
-          TAG="${GITHUB_REF_NAME}"
           DIST="dist/ClockPlayer"
           FILES=(
             index.html index.css index.js obs.html library.js config.js favicon.svg
@@ -37,7 +54,7 @@ jobs:
       - name: Extract release notes
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${TAG#v}"
           # 「## [0.2.0]」から次の「## [」の手前までを取り出す
           awk -v v="$VERSION" '
             index($0, "## [" v "]") == 1 { found = 1; next }
@@ -53,6 +70,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "dist/ClockPlayer-${GITHUB_REF_NAME}.zip" \
-            --title "$GITHUB_REF_NAME" \
+          # タグがまだ無ければ、このコミットに付けて作る
+          gh release create "$TAG" "dist/ClockPlayer-${TAG}.zip" \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
             --notes-file dist/notes.md
