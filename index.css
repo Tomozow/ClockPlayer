@@ -768,7 +768,7 @@ body.minimal-mode .glass-container {
   padding: 15px 24px;
   gap: 0;
   min-height: 100px;
-  max-width: 900px; /* Slightly wider to accommodate side-by-side text */
+  max-width: none; /* ウィンドウ幅いっぱいに広げる */
 }
 
 body.minimal-mode .clock-section {
@@ -908,7 +908,7 @@ body.minimal-mode .config-container {
   width: 100%;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 480px) {
   body.swap-panels-mode.minimal-mode .glass-container {
     grid-template-columns: 2.4fr 1fr;
   }
@@ -921,7 +921,7 @@ body.minimal-mode .config-container {
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 479px) {
   body.minimal-mode .glass-container {
     display: flex;
     flex-direction: column;
@@ -1435,4 +1435,41 @@ html.dock-mode .volume-slider {
 }
 #library-usage.library-usage-warn {
   color: #e0a040;
+}
+
+/* 時刻を非表示: 日付だけの列に詰め、日付を少し大きくして主表示にする */
+.hide-time-mode #time {
+  display: none !important;
+}
+@media (min-width: 480px) {
+  body.minimal-mode.hide-time-mode .glass-container {
+    grid-template-columns: auto 1fr;
+    column-gap: 24px;
+  }
+  body.minimal-mode.hide-time-mode.swap-panels-mode .glass-container {
+    grid-template-columns: 1fr auto;
+  }
+}
+body.minimal-mode.hide-time-mode .clock-section {
+  align-items: center;
+}
+body.minimal-mode.hide-time-mode .date-display {
+  font-size: 1.4rem !important;
+  color: var(--text-main) !important;
+}
+
+/* ミニマル表示: 高さ100px程度のウィンドウ（OBSソースなど）でも1行に収める */
+@media (max-height: 139px) {
+  body.minimal-mode {
+    padding: 6px;
+  }
+  body.minimal-mode .glass-container {
+    min-height: 0;
+    padding: 10px 44px 10px 18px; /* 右は設定ボタンの分を空ける */
+  }
+  body.minimal-mode .config-toggle-absolute {
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+  }
 }

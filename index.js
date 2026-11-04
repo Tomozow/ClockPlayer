@@ -42,6 +42,9 @@ function isDockMode() {
       if (data.layoutMinimal) {
         document.body.classList.add('minimal-mode');
       }
+      if (data.layoutHideTime) {
+        document.body.classList.add('hide-time-mode');
+      }
     }
   } catch (e) {
     console.error('Failed to apply initial OBS modes:', e);
@@ -75,7 +78,8 @@ const DEFAULT_CONFIG = {
   obsHideControls: false,
   obsKeepWindowBg: false,
   layoutSwapPanels: false,
-  layoutMinimal: false
+  layoutMinimal: false,
+  layoutHideTime: false
 };
 
 // Initial state, will be loaded from localStorage
@@ -98,6 +102,7 @@ let cfgObsHideControls = false;
 let cfgObsKeepWindowBg = false;
 let cfgLayoutSwapPanels = false;
 let cfgLayoutMinimal = false;
+let cfgLayoutHideTime = false;
 
 let activeSegmentIndex = -1;
 let selectedSegmentIndex = 0;
@@ -167,6 +172,7 @@ const obsHideControls = document.getElementById('obs-hide-controls');
 
 const layoutSwapPanels = document.getElementById('layout-swap-panels');
 const layoutMinimal = document.getElementById('layout-minimal');
+const layoutHideTime = document.getElementById('layout-hide-time');
 
 // Debug elements
 const debugTimeEnable = document.getElementById('debug-time-enable');
@@ -468,6 +474,7 @@ function applyOBSModes() {
   if (obsKeepWindowBg) cfgObsKeepWindowBg = obsKeepWindowBg.checked;
   if (layoutSwapPanels) cfgLayoutSwapPanels = layoutSwapPanels.checked;
   if (layoutMinimal) cfgLayoutMinimal = layoutMinimal.checked;
+  if (layoutHideTime) cfgLayoutHideTime = layoutHideTime.checked;
 
   const dock = isDockMode();
   document.body.classList.toggle('transparent-mode', cfgObsTransparent && !dock);
@@ -475,6 +482,7 @@ function applyOBSModes() {
   document.body.classList.toggle('keep-window-bg-mode', cfgObsKeepWindowBg && !dock);
   document.body.classList.toggle('swap-panels-mode', cfgLayoutSwapPanels && !dock);
   document.body.classList.toggle('minimal-mode', cfgLayoutMinimal && !dock);
+  document.body.classList.toggle('hide-time-mode', cfgLayoutHideTime && !dock);
 }
 
 // 曲リストを読み込む。ドックは読み込む前に、ファイルの無い記録を取り除く（ローカル版は bgm フォルダを走査し直す）
@@ -504,7 +512,8 @@ function saveConfig() {
     obsHideControls: obsHideControls ? obsHideControls.checked : cfgObsHideControls,
     obsKeepWindowBg: obsKeepWindowBg ? obsKeepWindowBg.checked : cfgObsKeepWindowBg,
     layoutSwapPanels: layoutSwapPanels ? layoutSwapPanels.checked : cfgLayoutSwapPanels,
-    layoutMinimal: layoutMinimal ? layoutMinimal.checked : cfgLayoutMinimal
+    layoutMinimal: layoutMinimal ? layoutMinimal.checked : cfgLayoutMinimal,
+    layoutHideTime: layoutHideTime ? layoutHideTime.checked : cfgLayoutHideTime
   };
 
   try {
@@ -547,6 +556,7 @@ function loadConfig() {
     cfgObsKeepWindowBg = data.obsKeepWindowBg !== undefined ? !!data.obsKeepWindowBg : false;
     cfgLayoutSwapPanels = data.layoutSwapPanels !== undefined ? !!data.layoutSwapPanels : false;
     cfgLayoutMinimal = data.layoutMinimal !== undefined ? !!data.layoutMinimal : false;
+    cfgLayoutHideTime = !!data.layoutHideTime;
 
     if (obsTransparent) {
       obsTransparent.checked = cfgObsTransparent;
@@ -563,6 +573,9 @@ function loadConfig() {
     }
     if (layoutMinimal) {
       layoutMinimal.checked = cfgLayoutMinimal;
+    }
+    if (layoutHideTime) {
+      layoutHideTime.checked = cfgLayoutHideTime;
     }
     applyOBSModes();
 
@@ -1149,6 +1162,13 @@ if (layoutSwapPanels) {
 
 if (layoutMinimal) {
   layoutMinimal.addEventListener('change', () => {
+    applyOBSModes();
+    saveConfig();
+  });
+}
+
+if (layoutHideTime) {
+  layoutHideTime.addEventListener('change', () => {
     applyOBSModes();
     saveConfig();
   });
